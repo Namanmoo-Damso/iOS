@@ -80,13 +80,32 @@ extension LiveKitService: RoomDelegate {
             self.connectionState = connectionState
             if connectionState == .connected {
                 self.errorMessage = nil
-                
-                // 재연결(Reconnecting -> Connected) 시 트랙 정보가 늦게 올 수 있으므로 300ms 뒤 강제 리프레시
-                if oldConnectionState == .reconnecting {
-                    try? await Task.sleep(nanoseconds: 300_000_000)
-                    self.objectWillChange.send()
-                }
+                self.reconnectMode = nil
             }
+            // 연결 상태 변화는 중요한 이벤트이므로 즉시 알림
+            self.objectWillChange.send()
+        }
+    }
+
+    nonisolated func room(_ room: Room, didStartReconnectWithMode reconnectMode: ReconnectMode) {
+        Task { @MainActor in
+            self.reconnectMode = reconnectMode
+            self.connectionState = .reconnecting
+            self.objectWillChange.send()
+        }
+    }
+
+    nonisolated func room(_ room: Room, didCompleteReconnectWithMode reconnectMode: ReconnectMode) {
+        Task { @MainActor in
+            self.reconnectMode = nil
+            self.connectionState = room.connectionState
+            self.objectWillChange.send()
+        }
+    }
+
+    nonisolated func room(_ room: Room, didUpdateReconnectMode reconnectMode: ReconnectMode) {
+        Task { @MainActor in
+            self.reconnectMode = reconnectMode
             self.objectWillChange.send()
         }
     }
@@ -111,30 +130,41 @@ extension LiveKitService: RoomDelegate {
         }
     }
     
-    // SDK 2.x 규격: didSubscribeTrack
+    nonisolated func room(_ room: Room, participant: RemoteParticipant, didPublishTrack publication: RemoteTrackPublication) {
+        Task { @MainActor in
+            debugLog("Track published: \(publication.kind)")
+            self.objectWillChange.send()
+        }
+    }
+
+    nonisolated func room(_ room: Room, participant: RemoteParticipant, didUnpublishTrack publication: RemoteTrackPublication) {
+        Task { @MainActor in
+            debugLog("Track unpublished: \(publication.kind)")
+            self.objectWillChange.send()
+        }
+    }
+
     nonisolated func room(_ room: Room, participant: RemoteParticipant, didSubscribeTrack publication: RemoteTrackPublication) {
         Task { @MainActor in
+            // 트랙 구독 완료 시에만 알림 (가장 핵심적인 갱신 포인트)
             debugLog("Track subscribed: \(publication.kind)")
             self.objectWillChange.send() 
         }
     }
     
-    // SDK 2.x 규격: didUnsubscribeTrack
     nonisolated func room(_ room: Room, participant: RemoteParticipant, didUnsubscribeTrack publication: RemoteTrackPublication) {
         Task { @MainActor in
-            debugLog("Track unsubscribed: \(publication.kind)")
             self.objectWillChange.send()
         }
     }
     
-    // 중요: private 제거하여 호출 보장
-    private nonisolated func room(_ room: Room, participant: RemoteParticipant, didUpdatePublication publication: RemoteTrackPublication) {
+    nonisolated func room(_ room: Room, participant: Participant, trackPublication: TrackPublication, didUpdateIsMuted isMuted: Bool) {
         Task { @MainActor in
             self.objectWillChange.send()
         }
     }
 
-    private nonisolated func room(_ room: Room, participant: RemoteParticipant, didUpdateTrack track: RemoteTrack) {
+    nonisolated func room(_ room: Room, participant: RemoteParticipant, trackPublication: RemoteTrackPublication, didUpdateStreamState streamState: StreamState) {
         Task { @MainActor in
             self.objectWillChange.send()
         }

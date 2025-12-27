@@ -150,9 +150,7 @@ struct VideoTileView: View {
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            // 트랙의 sid를 id로 박아 트랙이 바뀌면 뷰를 새로 만듭니다.
             SwiftUIVideoView(track, layoutMode: .fill, mirrorMode: mirrorMode)
-                .id(track.sid) 
                 .background(Color.black)
                 .clipped()
 
