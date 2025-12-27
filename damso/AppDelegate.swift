@@ -38,9 +38,13 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         debugLog("didFinishLaunching env=\(apnsEnv)")
-        configureUserNotifications(application)
-        configureVoipPushRegistry()
-        registerCachedTokensIfAvailable()
+        
+        // iPad 등에서 초기화 타이밍 문제 방지를 위해 비동기 실행
+        DispatchQueue.main.async {
+            self.configureUserNotifications(application)
+            self.configureVoipPushRegistry()
+            self.registerCachedTokensIfAvailable()
+        }
         return true
     }
 
@@ -207,7 +211,23 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     private func handleIncomingVoipPush(payload: PKPushPayload, completion: (() -> Void)?) {
         let payloadData = payload.dictionaryPayload
         let payloadKeys = payloadData.keys.map { "\($0)" }.joined(separator: ",")
+        
         let callId = payloadData["callId"] as? String ?? payloadData["call_id"] as? String
+        let type = (payloadData["type"] as? String)?.uppercased() ?? "INVITE"
+        
+        debugLog("voip push received type=\(type) keys=[\(payloadKeys)] callId=\(callId ?? "nil")")
+
+        // 통화 종료 푸시 처리 (백그라운드에서 CallKit 종료용)
+        if type == "BYE" || type == "END" || type == "DISCONNECT" {
+            if let uuidString = callId, let uuid = UUID(uuidString: uuidString) {
+                debugLog("ending call via push uuid=\(uuid)")
+                callManager.endCall(uuid: uuid)
+            }
+            completion?()
+            return
+        }
+
+        // 통화 초대 처리 (기본값)
         let caller = payloadData["callerName"] as? String
             ?? payloadData["caller"] as? String
             ?? payloadData["callerIdentity"] as? String
@@ -217,7 +237,6 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
             ?? payloadData["has_video"] as? Bool
             ?? true
         let uuid = UUID(uuidString: callId ?? "") ?? UUID()
-        debugLog("voip push received keys=[\(payloadKeys)] callId=\(callId ?? "nil") room=\(roomName ?? "nil") caller=\(caller) hasVideo=\(hasVideo)")
 
         callManager.reportIncomingCall(
             uuid: uuid,
