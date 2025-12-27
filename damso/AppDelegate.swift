@@ -119,7 +119,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         let identity = stableIdentity()
         debugLog("registerDeviceToken identity=\(identity) env=\(apnsEnv) apns=\(summarizeToken(apnsToken)) voip=\(summarizeToken(voipToken))")
 
-        let url = URL(string: "https://damsokj.duckdns.org/v1/devices/register")!
+        let url = URL(string: "\(AppConfig.apiBaseURL)/v1/devices/register")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")

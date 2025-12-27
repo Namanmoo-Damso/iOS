@@ -145,7 +145,7 @@ final class CallManager: NSObject {
     }
 
     private func sendCallState(callId: String, endpoint: String) {
-        guard let url = URL(string: "https://damsokj.duckdns.org\(endpoint)") else { return }
+        guard let url = URL(string: "\(AppConfig.apiBaseURL)\(endpoint)") else { return }
         debugLog("sendCallState endpoint=\(endpoint) callId=\(summarizeCallId(callId))")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"

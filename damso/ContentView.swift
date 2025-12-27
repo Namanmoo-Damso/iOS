@@ -352,8 +352,8 @@ final class LiveKitViewModel: NSObject, ObservableObject, RoomDelegate {
     let room: Room
     let localMedia: LocalMedia
 
-    private let liveKitServerURL = "wss://damsokj.duckdns.org:7880"
-    private let tokenEndpoint = URL(string: "https://damsokj.duckdns.org/v1/rtc/token")!
+    private let liveKitServerURL = AppConfig.liveKitServerURL
+    private let tokenEndpoint = URL(string: "\(AppConfig.apiBaseURL)/v1/rtc/token")!
     private let authTokenKey = "authToken"
     private let identityKey = "user_identity"
     private let apnsKey = "cached_apns_token"
@@ -473,8 +473,19 @@ final class LiveKitViewModel: NSObject, ObservableObject, RoomDelegate {
             connectionState = .connecting
             debugLog("connecting to LiveKit url=\(liveKitServerURL)")
 
+            // 1. 오디오 전처리 옵션 설정 (Noise Suppression, Echo Cancellation, AGC)
+            let audioOptions = AudioCaptureOptions(
+                echoCancellation: true,
+                autoGainControl: true, noiseSuppression: true,
+                typingNoiseDetection: true
+            )
+
+            let roomOptions = RoomOptions(
+                defaultAudioCaptureOptions: audioOptions
+            )
+
             let connectOptions = ConnectOptions(autoSubscribe: true, reconnectAttempts: 10)
-            try await room.connect(url: liveKitServerURL, token: token, connectOptions: connectOptions)
+            try await room.connect(url: liveKitServerURL, token: token, connectOptions: connectOptions, roomOptions: roomOptions)
             try await room.localParticipant.setMicrophone(enabled: true)
             
             // 1080p 화질 설정 적용
@@ -493,7 +504,7 @@ final class LiveKitViewModel: NSObject, ObservableObject, RoomDelegate {
     private func fetchApiToken() async throws -> String {
         let identity = stableIdentity()
 
-        let url = URL(string: "https://damsokj.duckdns.org/v1/auth/anonymous")!
+        let url = URL(string: "\(AppConfig.apiBaseURL)/v1/auth/anonymous")!
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -729,6 +740,19 @@ final class LiveKitViewModel: NSObject, ObservableObject, RoomDelegate {
             }
             connectionState = .disconnected
             debugLog("didDisconnect error=\(error?.localizedDescription ?? "nil")")
+        }
+    }
+
+    nonisolated func room(_ room: Room, participant: Participant, didUpdateIsSpeaking isSpeaking: Bool) {
+        if participant is LocalParticipant {
+            Task { @MainActor in
+                // VAD 이벤트 로그 출력
+                if isSpeaking {
+                    debugLog("🎤 User started speaking (VAD active)")
+                } else {
+                    debugLog("🤫 User stopped speaking (VAD inactive)")
+                }
+            }
         }
     }
 
