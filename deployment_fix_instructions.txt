@@ -1,0 +1,24 @@
+To fix the remaining validation errors, please follow these steps in Xcode:
+
+### 1. App Icon Issues (Missing PNG files)
+The project is missing the actual icon image files.
+1. Open **Xcode**.
+2. Go to **damso > Assets.xcassets > AppIcon**.
+3. You will see empty slots for iPhone and iPad icons.
+4. Drag and drop a **1024x1024 PNG** image into the **1024pt (App Store)** slot.
+5. Xcode might still complain about missing 120x120 or 152x152 files. To fix this quickly, ensure you have an image set for **All Sizes** or manually provide icons for each resolution.
+
+### 2. dSYM Issue (LiveKitWebRTC)
+The error says `LiveKitWebRTC.framework` dSYM is missing.
+1. In Xcode, go to the **damso** target settings.
+2. Go to **Build Settings** tab.
+3. Search for **Debug Information Format**.
+4. Ensure it is set to **DWARF with dSYM File** for both Debug and Release.
+5. If the error persists during upload, uncheck **"Include app symbols"** when the Distribution window pops up as a temporary workaround.
+
+### 3. Settings Updated
+I have already updated the following in `project.pbxproj`:
+- Added **iPad multitasking orientation** support.
+- Added **CFBundleIconName** key.
+
+After adding the icon images in Xcode, please try to **Archive** and **Distribute** again.

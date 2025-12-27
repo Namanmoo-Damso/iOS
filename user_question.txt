@@ -1,0 +1,10 @@
+To implement the automatic token retrieval via API authentication, I need to set up a **Login** feature.
+
+Could you please provide the **Login API details**?
+For example:
+- **URL**: (e.g., `https://damsokj.duckdns.org/v1/login`)
+- **Method**: (e.g., POST)
+- **Parameters**: (e.g., `username`, `password`)
+- **Response**: (Does it return the `authToken`?)
+
+Once provided, I will replace the manual token input with a proper Login screen.
