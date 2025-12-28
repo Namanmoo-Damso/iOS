@@ -13,10 +13,25 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     private var apnsEnv: String {
         resolveApnsEnv()
     }
+    private var bundleId: String {
+        Bundle.main.bundleIdentifier ?? "unknown.bundle"
+    }
+    private var expectedVoipTopic: String {
+        "\(bundleId).voip"
+    }
     private func debugLog(_ message: String) {
         #if DEBUG
         print("[AppDelegate] \(message)")
         #endif
+    }
+    private func diagLog(_ message: String) {
+        guard AppConfig.enablePushDiagnostics else { return }
+        print("[PushDiagnostics] \(message)")
+    }
+    private func appVersionString() -> String {
+        let short = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+        return "\(short) (\(build))"
     }
 
     private func resolveApnsEnv() -> String {
@@ -38,6 +53,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         debugLog("didFinishLaunching env=\(apnsEnv)")
+        diagLog("launch env=\(apnsEnv) bundle=\(bundleId) voipTopic=\(expectedVoipTopic) version=\(appVersionString()) device=\(UIDevice.current.model) system=\(UIDevice.current.systemVersion)")
         
         // iPad 등에서 초기화 타이밍 문제 방지를 위해 비동기 실행
         DispatchQueue.main.async {
@@ -52,11 +68,14 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         let center = UNUserNotificationCenter.current()
         center.delegate = self
         debugLog("requesting notification authorization")
+        diagLog("requesting notification authorization")
         center.requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
             if let error = error {
                 self.debugLog("notification authorization error: \(error)")
+                self.diagLog("notification authorization error: \(error)")
             } else {
                 self.debugLog("notification authorization granted=\(granted)")
+                self.diagLog("notification authorization granted=\(granted)")
             }
             guard granted else { return }
             DispatchQueue.main.async {
@@ -67,6 +86,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
 
     private func configureVoipPushRegistry() {
         debugLog("configuring VoIP push registry")
+        diagLog("configuring VoIP push registry (expected headers apns-push-type=voip, apns-topic=\(expectedVoipTopic))")
         let registry = PKPushRegistry(queue: DispatchQueue.main)
         registry.delegate = self
         registry.desiredPushTypes = [.voIP]
@@ -79,6 +99,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     ) {
         let token = deviceToken.map { String(format: "%02x", $0) }.joined()
         debugLog("APNs token updated \(summarizeToken(token))")
+        diagLog("APNs token full=\(token)")
         registerDeviceToken(apnsToken: token, voipToken: nil)
     }
 
@@ -87,6 +108,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
         debugLog("APNs registration failed: \(error)")
+        diagLog("APNs registration failed: \(error)")
     }
 
     // ... (rest of methods)
@@ -98,6 +120,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     ) {
         let token = pushCredentials.token.map { String(format: "%02x", $0) }.joined()
         debugLog("VoIP token updated \(summarizeToken(token))")
+        diagLog("VoIP token full=\(token)")
+        diagLog("expected headers apns-push-type=voip apns-topic=\(expectedVoipTopic)")
         registerDeviceToken(apnsToken: nil, voipToken: token)
     }
 
@@ -105,6 +129,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         let apnsToken = UserDefaults.standard.string(forKey: apnsKey)
         let voipToken = UserDefaults.standard.string(forKey: voipKey)
         debugLog("cached tokens apns=\(summarizeToken(apnsToken)) voip=\(summarizeToken(voipToken))")
+        if let apnsToken { diagLog("cached APNs token full=\(apnsToken)") }
+        if let voipToken { diagLog("cached VoIP token full=\(voipToken)") }
         if apnsToken != nil || voipToken != nil {
             registerDeviceToken(apnsToken: apnsToken, voipToken: voipToken)
         }
@@ -122,8 +148,16 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     private func registerDeviceToken(apnsToken: String?, voipToken: String?) {
         let identity = stableIdentity()
         debugLog("registerDeviceToken identity=\(identity) env=\(apnsEnv) apns=\(summarizeToken(apnsToken)) voip=\(summarizeToken(voipToken))")
+        if let apnsToken { debugLog("registerDeviceToken env=\(apnsEnv) apns=\(apnsToken)") }
+        if let voipToken { debugLog("registerDeviceToken env=\(apnsEnv) voip=\(voipToken)") }
 
-        let url = URL(string: "\(AppConfig.apiBaseURL)/v1/devices/register")!
+        let apiBase: String = AppConfig.apiBaseURL
+        let urlString = "\(apiBase)/v1/devices/register"
+        guard let url = URL(string: urlString) else {
+            debugLog("Failed to create URL from: \(urlString)")
+            return
+        }
+        
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -189,6 +223,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         didInvalidatePushTokenFor type: PKPushType
     ) {
         debugLog("VoIP token invalidated")
+        diagLog("VoIP token invalidated")
     }
 
     func pushRegistry(
@@ -216,6 +251,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         let type = (payloadData["type"] as? String)?.uppercased() ?? "INVITE"
         
         debugLog("voip push received type=\(type) keys=[\(payloadKeys)] callId=\(callId ?? "nil")")
+        diagLog("voip push received type=\(type) keys=[\(payloadKeys)] callId=\(callId ?? "nil")")
 
         // 통화 종료 푸시 처리 (백그라운드에서 CallKit 종료용)
         if type == "BYE" || type == "END" || type == "DISCONNECT" {

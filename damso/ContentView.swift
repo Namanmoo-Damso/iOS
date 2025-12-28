@@ -6,11 +6,21 @@ import LiveKit
 #endif
 
 struct ContentView: View {
+    @State private var isServerSelected = false
+    
     #if canImport(LiveKit)
     @StateObject private var viewModel = LiveKitViewModel()
 
     var body: some View {
-        LiveKitRoomView(viewModel: viewModel)
+        Group {
+            if isServerSelected {
+                LiveKitRoomView(viewModel: viewModel)
+                    .transition(.move(edge: .trailing))
+            } else {
+                StartView(isServerSelected: $isServerSelected)
+            }
+        }
+        .animation(.default, value: isServerSelected)
     }
     #else
     var body: some View {
