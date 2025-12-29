@@ -11,6 +11,7 @@ import SwiftUI
 struct WardHomeView: View {
     @EnvironmentObject var appState: AppState
     @State private var showCallView = false
+    @AppStorage("locationTrackingEnabled") private var locationTrackingEnabled = true
 
     var body: some View {
         NavigationStack {
@@ -62,6 +63,12 @@ struct WardHomeView: View {
                     dismissOnCallEnd: true
                 )
                 .environmentObject(appState)
+            }
+            .onAppear {
+                // 위치 추적 자동 시작
+                if locationTrackingEnabled {
+                    LocationService.shared.startTracking()
+                }
             }
         }
     }
