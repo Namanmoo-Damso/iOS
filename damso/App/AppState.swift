@@ -89,6 +89,29 @@ final class AppState: ObservableObject {
         debugLog("User logged out")
     }
 
+    /// 회원탈퇴
+    func withdraw() async throws {
+        debugLog("Withdrawing user...")
+
+        do {
+            // 서버에 탈퇴 요청
+            try await authService.deleteUser()
+
+            // 카카오 연결 끊기
+            await KakaoAuthService.shared.unlink()
+
+            // 로컬 상태 정리
+            TokenManager.shared.clearTokens()
+            currentUser = nil
+            isAuthenticated = false
+
+            debugLog("User withdrawn successfully")
+        } catch {
+            debugLog("Withdraw failed: \(error)")
+            throw error
+        }
+    }
+
     // MARK: - Private Methods
 
     private func handleAuthError(_ error: AuthError) async {
