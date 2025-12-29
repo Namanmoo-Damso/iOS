@@ -248,5 +248,98 @@ final class UserModelTests: XCTestCase {
         XCTAssertFalse(response.refreshToken.isEmpty)
         XCTAssertEqual(response.expiresIn, 3600)
         XCTAssertEqual(response.user.nickname, "테스트")
+        XCTAssertNil(response.matchStatus)
+        XCTAssertNil(response.matchMessage)
+    }
+
+    // MARK: - MatchStatus Tests
+
+    func test_matchStatus_codable() throws {
+        // Given
+        let matched = MatchStatus.matched
+        let notMatched = MatchStatus.notMatched
+        let pending = MatchStatus.pending
+
+        // When
+        let encodedMatched = try JSONEncoder().encode(matched)
+        let encodedNotMatched = try JSONEncoder().encode(notMatched)
+        let encodedPending = try JSONEncoder().encode(pending)
+
+        // Then
+        XCTAssertEqual(String(data: encodedMatched, encoding: .utf8), "\"matched\"")
+        XCTAssertEqual(String(data: encodedNotMatched, encoding: .utf8), "\"not_matched\"")
+        XCTAssertEqual(String(data: encodedPending, encoding: .utf8), "\"pending\"")
+    }
+
+    func test_authResponse_withMatchStatus_matched() throws {
+        // Given
+        let json = """
+        {
+            "access_token": "token",
+            "refresh_token": "refresh",
+            "expires_in": 3600,
+            "user": {
+                "id": "user-uuid-001",
+                "kakao_id": "1234567890",
+                "email": "ward@example.com",
+                "nickname": "어르신",
+                "profile_image_url": null,
+                "user_type": "ward",
+                "created_at": "2024-01-01T00:00:00Z",
+                "guardian_info": null,
+                "ward_info": {
+                    "phone_number": "010-1234-5678",
+                    "linked_guardian": {
+                        "id": "guardian-001",
+                        "user_id": "user-001",
+                        "nickname": "보호자",
+                        "profile_image_url": null
+                    },
+                    "linked_organization": null
+                }
+            },
+            "match_status": "matched",
+            "match_message": null
+        }
+        """.data(using: .utf8)!
+
+        // When
+        let response = try JSONDecoder.apiDecoder.decode(AuthResponse.self, from: json)
+
+        // Then
+        XCTAssertEqual(response.matchStatus, .matched)
+        XCTAssertNil(response.matchMessage)
+        XCTAssertNotNil(response.user.wardInfo?.linkedGuardian)
+    }
+
+    func test_authResponse_withMatchStatus_notMatched() throws {
+        // Given
+        let json = """
+        {
+            "access_token": "token",
+            "refresh_token": "refresh",
+            "expires_in": 3600,
+            "user": {
+                "id": "user-uuid-001",
+                "kakao_id": "1234567890",
+                "email": "ward@example.com",
+                "nickname": "어르신",
+                "profile_image_url": null,
+                "user_type": "ward",
+                "created_at": "2024-01-01T00:00:00Z",
+                "guardian_info": null,
+                "ward_info": null
+            },
+            "match_status": "not_matched",
+            "match_message": "등록된 보호자 정보가 없습니다."
+        }
+        """.data(using: .utf8)!
+
+        // When
+        let response = try JSONDecoder.apiDecoder.decode(AuthResponse.self, from: json)
+
+        // Then
+        XCTAssertEqual(response.matchStatus, .notMatched)
+        XCTAssertEqual(response.matchMessage, "등록된 보호자 정보가 없습니다.")
     }
 }
