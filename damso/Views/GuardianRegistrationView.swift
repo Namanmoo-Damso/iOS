@@ -12,8 +12,8 @@ struct GuardianRegistrationView: View {
     /// 카카오에서 가져온 사용자 정보
     let kakaoUserInfo: KakaoUserInfo
 
-    /// 등록 완료 콜백
-    let onRegistrationComplete: () -> Void
+    /// 등록 완료 콜백 (wardEmail 전달)
+    let onRegistrationComplete: (String) -> Void
 
     /// 뒤로가기 콜백
     let onBack: (() -> Void)?
@@ -33,7 +33,7 @@ struct GuardianRegistrationView: View {
 
     init(
         kakaoUserInfo: KakaoUserInfo,
-        onRegistrationComplete: @escaping () -> Void,
+        onRegistrationComplete: @escaping (String) -> Void,
         onBack: (() -> Void)? = nil
     ) {
         self.kakaoUserInfo = kakaoUserInfo
@@ -82,7 +82,7 @@ struct GuardianRegistrationView: View {
         }
         .alert("등록 완료", isPresented: $showSuccessAlert) {
             Button("확인") {
-                onRegistrationComplete()
+                onRegistrationComplete(wardEmail)
             }
         } message: {
             Text("보호자 등록이 완료되었습니다.\n어르신을 초대해 주세요.")
@@ -324,6 +324,6 @@ struct GuardianRegistrationView: View {
             email: "hong@email.com",
             profileImageUrl: nil
         ),
-        onRegistrationComplete: { print("Complete") }
+        onRegistrationComplete: { wardEmail in print("Complete with \(wardEmail)") }
     )
 }
