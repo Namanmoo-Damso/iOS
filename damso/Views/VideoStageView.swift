@@ -38,9 +38,10 @@ struct VideoStageView: View {
                     HStack {
                         Spacer()
                         VideoTileView(track: localTrack, label: "You", mirrorMode: .mirror)
-                            .frame(width: 120, height: 170)
-                            .padding(12)
+                            .frame(width: 140, height: 200)
                             .shadow(radius: 5)
+                            .padding(.trailing, 12)
+                            .padding(.top, 44) // 네트워크 상태 뷰 아래로
                     }
                     Spacer()
                 }

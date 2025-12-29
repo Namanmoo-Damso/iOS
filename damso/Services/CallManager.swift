@@ -18,10 +18,14 @@ struct CallInfo: Identifiable {
 }
 
 @MainActor
-final class CallStateStore: ObservableObject {
+final class CallStateStore: ObservableObject, CallStateStoreProtocol {
     static let shared = CallStateStore()
 
     @Published private(set) var activeCall: CallInfo?
+
+    var activeCallPublisher: AnyPublisher<CallInfo?, Never> {
+        $activeCall.eraseToAnyPublisher()
+    }
 
     func setIncoming(uuid: UUID, callId: String?, handle: String, hasVideo: Bool, roomName: String?) {
         activeCall = CallInfo(
@@ -34,12 +38,24 @@ final class CallStateStore: ObservableObject {
         )
     }
 
+    /// 알림에서 수락 시 바로 통화 시작 (WiFi-only iPad용)
+    func setAnswered(uuid: UUID, callId: String?, handle: String, hasVideo: Bool, roomName: String?) {
+        activeCall = CallInfo(
+            id: uuid,
+            callId: callId,
+            handle: handle,
+            hasVideo: hasVideo,
+            roomName: roomName,
+            status: .answered
+        )
+    }
+
     func clearCall() {
         activeCall = nil
     }
 }
 
-final class CallManager: NSObject {
+final class CallManager: NSObject, CallManagerProtocol {
     static let shared = CallManager()
 
     private let provider: CXProvider
@@ -48,7 +64,7 @@ final class CallManager: NSObject {
     private var roomByUUID: [UUID: String] = [:]
     private var handleByUUID: [UUID: String] = [:]
     private var hasVideoByUUID: [UUID: Bool] = [:]
-    private func debugLog(_ message: String) {
+    nonisolated private func debugLog(_ message: String) {
         #if DEBUG
         print("[CallManager] \(message)")
         #endif
@@ -79,7 +95,7 @@ final class CallManager: NSObject {
         hasVideo: Bool,
         callId: String?,
         roomName: String?,
-        completion: ((Error?) -> Void)? = nil
+        completion: (@Sendable (Error?) -> Void)? = nil
     ) {
         debugLog("reportIncomingCall uuid=\(uuid.uuidString) callId=\(summarizeCallId(callId)) room=\(roomName ?? "nil") handle=\(handle) hasVideo=\(hasVideo)")
         if let callId {
@@ -177,14 +193,32 @@ extension CallManager: CXProviderDelegate {
     }
 
     func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
-        debugLog("provider answerCall action uuid=\(action.callUUID.uuidString)")
-        if let callId = callIdByUUID[action.callUUID] {
+        let uuid = action.callUUID
+        debugLog("provider answerCall action uuid=\(uuid.uuidString)")
+        if let callId = callIdByUUID[uuid] {
             sendCallState(callId: callId, endpoint: "/v1/calls/answer")
         }
+
+        // 통화 정보를 .answered 상태로 설정하여 자동 시작
+        let callId = callIdByUUID[uuid]
+        let roomName = roomByUUID[uuid]
+        let handle = handleByUUID[uuid] ?? "Unknown"
+        let hasVideo = hasVideoByUUID[uuid] ?? true
+
         Task { @MainActor in
-            CallStateStore.shared.clearCall()
+            CallStateStore.shared.setAnswered(
+                uuid: uuid,
+                callId: callId,
+                handle: handle,
+                hasVideo: hasVideo,
+                roomName: roomName
+            )
         }
         action.fulfill()
+
+        // CallKit UI 자동 종료 (앱 내 통화로 전환)
+        provider.reportCall(with: uuid, endedAt: nil, reason: .answeredElsewhere)
+        cleanupCall(uuid: uuid)
     }
 
     func provider(_ provider: CXProvider, perform action: CXEndCallAction) {

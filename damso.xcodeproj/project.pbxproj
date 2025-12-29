@@ -8,10 +8,24 @@
 
 /* Begin PBXBuildFile section */
 		4FCB14952EFDA8E100ADACA9 /* LiveKit in Frameworks */ = {isa = PBXBuildFile; productRef = 4FCB14942EFDA8E100ADACA9 /* LiveKit */; };
+		4FF7E0222F02A57D003B6A35 /* KakaoSDKAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 4FF7E0212F02A57D003B6A35 /* KakaoSDKAuth */; };
+		4FF7E0242F02A57D003B6A35 /* KakaoSDKCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 4FF7E0232F02A57D003B6A35 /* KakaoSDKCommon */; };
+		4FF7E0262F02A57D003B6A35 /* KakaoSDKUser in Frameworks */ = {isa = PBXBuildFile; productRef = 4FF7E0252F02A57D003B6A35 /* KakaoSDKUser */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		4F0B95802EFD97C900B8DCDE /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4F0B955C2EFD97C800B8DCDE /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4F0B95632EFD97C800B8DCDE;
+			remoteInfo = damso;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		4F0B95642EFD97C800B8DCDE /* damso.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = damso.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4F0B95782EFD97C900B8DCDE /* damsoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = damsoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -21,6 +35,13 @@
 				Info.plist,
 			);
 			target = 4F0B95632EFD97C800B8DCDE /* damso */;
+		};
+		4FCB15672EFE369600ADACA9 /* Exceptions for "damsoTests" folder in "damsoTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 4F0B95772EFD97C900B8DCDE /* damsoTests */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -33,6 +54,14 @@
 			path = damso;
 			sourceTree = "<group>";
 		};
+		4F0B95792EFD97C900B8DCDE /* damsoTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				4FCB15672EFE369600ADACA9 /* Exceptions for "damsoTests" folder in "damsoTests" target */,
+			);
+			path = damsoTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -40,7 +69,17 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4FF7E0262F02A57D003B6A35 /* KakaoSDKUser in Frameworks */,
 				4FCB14952EFDA8E100ADACA9 /* LiveKit in Frameworks */,
+				4FF7E0242F02A57D003B6A35 /* KakaoSDKCommon in Frameworks */,
+				4FF7E0222F02A57D003B6A35 /* KakaoSDKAuth in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4F0B95752EFD97C900B8DCDE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -51,6 +90,7 @@
 			isa = PBXGroup;
 			children = (
 				4F0B95662EFD97C800B8DCDE /* damso */,
+				4F0B95792EFD97C900B8DCDE /* damsoTests */,
 				4F0B95652EFD97C800B8DCDE /* Products */,
 			);
 			sourceTree = "<group>";
@@ -59,6 +99,7 @@
 			isa = PBXGroup;
 			children = (
 				4F0B95642EFD97C800B8DCDE /* damso.app */,
+				4F0B95782EFD97C900B8DCDE /* damsoTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -84,10 +125,36 @@
 			name = damso;
 			packageProductDependencies = (
 				4FCB14942EFDA8E100ADACA9 /* LiveKit */,
+				4FF7E0212F02A57D003B6A35 /* KakaoSDKAuth */,
+				4FF7E0232F02A57D003B6A35 /* KakaoSDKCommon */,
+				4FF7E0252F02A57D003B6A35 /* KakaoSDKUser */,
 			);
 			productName = damso;
 			productReference = 4F0B95642EFD97C800B8DCDE /* damso.app */;
 			productType = "com.apple.product-type.application";
+		};
+		4F0B95772EFD97C900B8DCDE /* damsoTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4F0B957F2EFD97C900B8DCDE /* Build configuration list for PBXNativeTarget "damsoTests" */;
+			buildPhases = (
+				4F0B95742EFD97C900B8DCDE /* Sources */,
+				4F0B95752EFD97C900B8DCDE /* Frameworks */,
+				4F0B95762EFD97C900B8DCDE /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				4F0B95812EFD97C900B8DCDE /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				4F0B95792EFD97C900B8DCDE /* damsoTests */,
+			);
+			name = damsoTests;
+			packageProductDependencies = (
+			);
+			productName = damsoTests;
+			productReference = 4F0B95782EFD97C900B8DCDE /* damsoTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -110,6 +177,10 @@
 							};
 						};
 					};
+					4F0B95772EFD97C900B8DCDE = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 4F0B95632EFD97C800B8DCDE;
+					};
 				};
 			};
 			buildConfigurationList = 4F0B955F2EFD97C800B8DCDE /* Build configuration list for PBXProject "damso" */;
@@ -123,6 +194,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				4FCB14932EFDA8E100ADACA9 /* XCRemoteSwiftPackageReference "client-sdk-swift" */,
+				4FF7E0202F02A57D003B6A35 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 4F0B95652EFD97C800B8DCDE /* Products */;
@@ -130,12 +202,20 @@
 			projectRoot = "";
 			targets = (
 				4F0B95632EFD97C800B8DCDE /* damso */,
+				4F0B95772EFD97C900B8DCDE /* damsoTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		4F0B95622EFD97C800B8DCDE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4F0B95762EFD97C900B8DCDE /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -152,7 +232,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		4F0B95742EFD97C900B8DCDE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		4F0B95812EFD97C900B8DCDE /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4F0B95632EFD97C800B8DCDE /* damso */;
+			targetProxy = 4F0B95802EFD97C900B8DCDE /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		4F0B956D2EFD97C900B8DCDE /* Debug */ = {
@@ -315,7 +410,7 @@
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = NO;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -359,8 +454,62 @@
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = NO;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		4F0B957C2EFD97C900B8DCDE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 4Y5BW58548;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = damsoTests/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ilim.damsoTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/damso.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/damso";
+			};
+			name = Debug;
+		};
+		4F0B957D2EFD97C900B8DCDE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 4Y5BW58548;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = damsoTests/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ilim.damsoTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/damso.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/damso";
 			};
 			name = Release;
 		};
@@ -385,6 +534,15 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		4F0B957F2EFD97C900B8DCDE /* Build configuration list for PBXNativeTarget "damsoTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4F0B957C2EFD97C900B8DCDE /* Debug */,
+				4F0B957D2EFD97C900B8DCDE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
@@ -396,6 +554,14 @@
 				minimumVersion = 2.10.2;
 			};
 		};
+		4FF7E0202F02A57D003B6A35 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/kakao/kakao-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.27.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -403,6 +569,21 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 4FCB14932EFDA8E100ADACA9 /* XCRemoteSwiftPackageReference "client-sdk-swift" */;
 			productName = LiveKit;
+		};
+		4FF7E0212F02A57D003B6A35 /* KakaoSDKAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4FF7E0202F02A57D003B6A35 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */;
+			productName = KakaoSDKAuth;
+		};
+		4FF7E0232F02A57D003B6A35 /* KakaoSDKCommon */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4FF7E0202F02A57D003B6A35 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */;
+			productName = KakaoSDKCommon;
+		};
+		4FF7E0252F02A57D003B6A35 /* KakaoSDKUser */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4FF7E0202F02A57D003B6A35 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */;
+			productName = KakaoSDKUser;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -5,37 +5,70 @@ import SwiftUI
 import LiveKit
 
 @MainActor
-final class LiveKitViewModel: ObservableObject {
-    // Services
-    let liveKitService = LiveKitService()
-    let authService = AuthService()
-    
+final class LiveKitViewModel<
+    LKS: LiveKitServiceProtocol,
+    AS: AuthServiceProtocol,
+    CSS: CallStateStoreProtocol,
+    CM: CallManagerProtocol
+>: ObservableObject {
+    // Services (DIP: Protocol 타입으로 주입)
+    private let liveKitService: LKS
+    private let authService: AS
+    private let callStateStore: CSS
+    private let callManager: CM
+
     // CallKit State
     @Published var incomingCall: CallInfo?
-    
+
     // UI State
     @Published var isRequestingToken = false
     @Published var activeRoomName = "demo-room"
-    
+
     // Proxy Properties
     var room: Room { liveKitService.room }
     var localMedia: LocalMedia { liveKitService.localMedia }
-    
+
     // Service 상태 구독
     private var cancellables = Set<AnyCancellable>()
-    
-    init() {
+
+    init(
+        liveKitService: LKS,
+        authService: AS,
+        callStateStore: CSS,
+        callManager: CM
+    ) {
+        self.liveKitService = liveKitService
+        self.authService = authService
+        self.callStateStore = callStateStore
+        self.callManager = callManager
+
         // Service의 상태 변화를 그대로 View에 알림
         liveKitService.objectWillChange
             .sink { [weak self] _ in
                 self?.objectWillChange.send()
             }
             .store(in: &cancellables)
-            
-        CallStateStore.shared.$activeCall
+
+        callStateStore.activeCallPublisher
             .receive(on: RunLoop.main)
-            .assign(to: \.incomingCall, on: self)
+            .sink { [weak self] call in
+                self?.incomingCall = call
+                // .answered 상태면 자동으로 통화 시작
+                if let call, call.status == .answered {
+                    self?.handleAutoAccept(call: call)
+                }
+            }
             .store(in: &cancellables)
+    }
+
+    /// 알림에서 수락 시 자동으로 통화 시작 (WiFi-only iPad)
+    private func handleAutoAccept(call: CallInfo) {
+        callStateStore.clearCall()
+        if let roomName = call.roomName {
+            startCall(roomName: roomName)
+        } else {
+            startCall()
+        }
     }
     
     // Computed Properties for UI
@@ -71,9 +104,27 @@ final class LiveKitViewModel: ObservableObject {
         case .connected: return .green
         case .reconnecting: return .orange
         default: return .secondary
+        }
     }
+
+    // 재연결 상태
+    var isReconnecting: Bool {
+        liveKitService.isReconnecting
     }
-    
+
+    var reconnectTimeRemaining: Int {
+        liveKitService.reconnectTimeRemaining
+    }
+
+    // 상대방 연결 끊김 상태
+    var remoteParticipantDisconnected: Bool {
+        liveKitService.remoteParticipantDisconnected
+    }
+
+    var remoteDisconnectTimeRemaining: Int {
+        liveKitService.remoteDisconnectTimeRemaining
+    }
+
     @Published var errorMessage: String? = nil
 
     // Actions
@@ -115,19 +166,44 @@ final class LiveKitViewModel: ObservableObject {
     // MARK: - CallKit Actions
     func acceptIncomingCall() {
         guard let call = incomingCall else { return }
-        CallManager.shared.answerCall(uuid: call.id)
-        
-        // 통화 수락 후 LiveKit 방 입장
-        if let roomName = call.roomName {
-            startCall(roomName: roomName)
+
+        if resolveCallCapability() == .callKit {
+            // CallKit: answerCall → setAnswered → handleAutoAccept에서 startCall 호출됨
+            callManager.answerCall(uuid: call.id)
         } else {
-            startCall()
+            // WiFi-only iPad: CallKit 없이 직접 처리
+            callStateStore.clearCall()
+            if let roomName = call.roomName {
+                startCall(roomName: roomName)
+            } else {
+                startCall()
+            }
         }
     }
-    
+
     func declineIncomingCall() {
         guard let call = incomingCall else { return }
-        CallManager.shared.endCall(uuid: call.id)
+
+        if resolveCallCapability() == .callKit {
+            callManager.endCall(uuid: call.id)
+        } else {
+            // WiFi-only iPad: CallKit 없이 직접 처리
+            callStateStore.clearCall()
+            // 서버에 거절 알림
+            notifyDeclineToServer(callId: call.callId)
+        }
+    }
+
+    private func notifyDeclineToServer(callId: String?) {
+        guard let callId else { return }
+        guard let url = URL(string: "\(AppConfig.apiBaseURL)/v1/calls/end") else { return }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["callId": callId])
+
+        URLSession.shared.dataTask(with: request) { _, _, _ in }.resume()
     }
 }
 #endif
