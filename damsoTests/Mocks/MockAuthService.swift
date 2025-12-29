@@ -18,6 +18,7 @@ final class MockAuthService: AuthServiceProtocol {
     var loginWithKakaoResult: Result<AuthResponse, Error>?
     var refreshTokenResult: Result<TokenRefreshResponse, Error>?
     var getMeResult: Result<UserMeResponse, Error>?
+    var registerGuardianResult: Result<GuardianRegistrationResponse, Error>?
 
     // MARK: - Call Tracking
 
@@ -27,6 +28,10 @@ final class MockAuthService: AuthServiceProtocol {
     var refreshTokenCallCount = 0
     var logoutCallCount = 0
     var getMeCallCount = 0
+    var registerGuardianCallCount = 0
+
+    var lastWardEmail: String?
+    var lastWardPhoneNumber: String?
 
     var lastRoomName: String?
     var lastKakaoAccessToken: String?
@@ -146,6 +151,30 @@ final class MockAuthService: AuthServiceProtocol {
         )
     }
 
+    func registerGuardian(wardEmail: String, wardPhoneNumber: String) async throws -> GuardianRegistrationResponse {
+        registerGuardianCallCount += 1
+        lastWardEmail = wardEmail
+        lastWardPhoneNumber = wardPhoneNumber
+
+        if let result = registerGuardianResult {
+            switch result {
+            case .success(let response):
+                return response
+            case .failure(let error):
+                throw error
+            }
+        }
+
+        // 기본 mock 응답
+        return GuardianRegistrationResponse(
+            guardianId: "mock-guardian-id",
+            userId: "mock-user-id",
+            wardEmail: wardEmail,
+            wardPhoneNumber: wardPhoneNumber,
+            message: "Guardian registered successfully"
+        )
+    }
+
     // MARK: - Test Helpers
 
     func reset() {
@@ -155,9 +184,12 @@ final class MockAuthService: AuthServiceProtocol {
         refreshTokenCallCount = 0
         logoutCallCount = 0
         getMeCallCount = 0
+        registerGuardianCallCount = 0
         lastRoomName = nil
         lastKakaoAccessToken = nil
         lastUserType = nil
+        lastWardEmail = nil
+        lastWardPhoneNumber = nil
         isLoggedIn = false
 
         fetchApiTokenResult = .success("mock-api-token")
@@ -165,5 +197,6 @@ final class MockAuthService: AuthServiceProtocol {
         loginWithKakaoResult = nil
         refreshTokenResult = nil
         getMeResult = nil
+        registerGuardianResult = nil
     }
 }
