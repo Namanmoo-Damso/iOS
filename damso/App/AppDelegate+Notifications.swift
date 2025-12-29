@@ -30,6 +30,44 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         completionHandler([.banner, .sound, .badge])
     }
 
+    /// 일반 알림 탭 처리 (통화 알림 외)
+    private func handleGeneralNotificationTap(userInfo: [AnyHashable: Any]) {
+        guard let type = userInfo["type"] as? String else { return }
+
+        debugLog("handleGeneralNotificationTap type=\(type)")
+
+        Task { @MainActor in
+            switch type {
+            case "call_reminder":
+                // 통화 리마인더 → 홈 화면으로 이동
+                NotificationCenter.default.post(
+                    name: .navigateToTab,
+                    object: nil,
+                    userInfo: ["tab": "home"]
+                )
+
+            case "health_alert":
+                // 건강 알림 → 보고서 화면으로 이동
+                NotificationCenter.default.post(
+                    name: .navigateToTab,
+                    object: nil,
+                    userInfo: ["tab": "report"]
+                )
+
+            case "call_complete", "call_missed":
+                // 통화 완료/미진행 → 대시보드로 이동
+                NotificationCenter.default.post(
+                    name: .navigateToTab,
+                    object: nil,
+                    userInfo: ["tab": "home"]
+                )
+
+            default:
+                debugLog("Unknown notification type: \(type)")
+            }
+        }
+    }
+
     /// 알림 액션(수락/거절) 또는 탭 처리
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
@@ -40,7 +78,11 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         let category = response.notification.request.content.categoryIdentifier
         let notificationId = response.notification.request.identifier
 
+        // 일반 알림 탭 처리 (통화 알림 외)
         guard category == "INCOMING_CALL" else {
+            if response.actionIdentifier == UNNotificationDefaultActionIdentifier {
+                handleGeneralNotificationTap(userInfo: userInfo)
+            }
             completionHandler()
             return
         }
