@@ -27,7 +27,7 @@ enum TokenError: LocalizedError {
     }
 }
 
-class AuthService {
+final class AuthService: AuthServiceProtocol {
     private let authTokenKey = "authToken"
     private let identityKey = "user_identity"
     private let apnsKey = "cached_apns_token"
@@ -35,7 +35,7 @@ class AuthService {
     
     private var apnsEnv: String {
         #if DEBUG
-        return "dev"
+        return "sandbox"
         #else
         return "prod"
         #endif
@@ -50,8 +50,10 @@ class AuthService {
     // 익명 인증 토큰 발급
     func fetchApiToken() async throws(TokenError) -> String {
         let identity = stableIdentity()
-        let url = URL(string: "\(AppConfig.apiBaseURL)/v1/auth/anonymous")!
-        
+        guard let url = URL(string: "\(AppConfig.apiBaseURL)/v1/auth/anonymous") else {
+            throw .networkError("Invalid auth URL")
+        }
+
         var req = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 10)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -96,10 +98,15 @@ class AuthService {
         if authToken == nil || authToken?.isEmpty == true {
             authToken = try await fetchApiToken()
         }
-        
-        let token = authToken!
-        let tokenEndpoint = URL(string: "\(AppConfig.apiBaseURL)/v1/rtc/token")!
-        
+
+        guard let token = authToken else {
+            throw .missingAuthToken
+        }
+
+        guard let tokenEndpoint = URL(string: "\(AppConfig.apiBaseURL)/v1/rtc/token") else {
+            throw .networkError("Invalid token URL")
+        }
+
         var request = URLRequest(url: tokenEndpoint, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 10)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -110,20 +117,24 @@ class AuthService {
         let cachedApns = UserDefaults.standard.string(forKey: apnsKey)
         let cachedVoip = UserDefaults.standard.string(forKey: voipKey)
         
+        let supportsCallKit = resolveCallCapability() == .callKit
+
         var body: [String: Any] = [
             "roomName": roomName,
             "identity": identity,
             "name": "iOS User",
             "role": "viewer",
             "platform": "ios",
-            "env": apnsEnv
+            "env": apnsEnv,
+            "supportsCallKit": supportsCallKit
         ]
-        
+
         // Swift 6 Shorthand if let
         if let cachedApns, !cachedApns.isEmpty {
             body["apnsToken"] = cachedApns
         }
-        if let cachedVoip, !cachedVoip.isEmpty {
+        // WiFi-only iPad는 voipToken 전송하지 않음
+        if supportsCallKit, let cachedVoip, !cachedVoip.isEmpty {
             body["voipToken"] = cachedVoip
         }
         

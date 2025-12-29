@@ -1,5 +1,6 @@
 import Foundation
 
+@MainActor
 struct AppConfig {
     /// 현재 설정된 서버 도메인 (기본값은 damsokj)
     static var serverDomain: String {
@@ -22,5 +23,5 @@ struct AppConfig {
     }
     
     /// 푸시 진단 로그 활성화 여부
-    static let enablePushDiagnostics = true
+    nonisolated static let enablePushDiagnostics = true
 }

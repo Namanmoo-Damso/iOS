@@ -7,5 +7,24 @@
 		<string>voip</string>
 		<string>remote-notification</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>kakao85bb4e3941d219d5c10b28ee5d2a3b99</string>
+			</array>
+		</dict>
+	</array>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>kakaokompassauth</string>
+		<string>kakaolink</string>
+		<string>kakaoplus</string>
+	</array>
+	<key>KAKAO_NATIVE_APP_KEY</key>
+	<string>85bb4e3941d219d5c10b28ee5d2a3b99</string>
 </dict>
 </plist>
