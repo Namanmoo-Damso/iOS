@@ -17,6 +17,16 @@
 				<string>kakao85bb4e3941d219d5c10b28ee5d2a3b99</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>CFBundleURLName</key>
+			<string>com.ilim.damso</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>damso</string>
+			</array>
+		</dict>
 	</array>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
