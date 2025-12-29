@@ -1,13 +1,40 @@
+//
+//  MockAuthService.swift
+//  damsoTests
+//
+//  Created by Claude Code on 2024-12-29.
+//
+
 import Foundation
 @testable import damso
 
+@MainActor
 final class MockAuthService: AuthServiceProtocol {
+
+    // MARK: - Configurable Results
+
     var fetchApiTokenResult: Result<String, Error> = .success("mock-api-token")
     var fetchLiveKitTokenResult: Result<String, Error> = .success("mock-livekit-token")
+    var loginWithKakaoResult: Result<AuthResponse, Error>?
+    var refreshTokenResult: Result<TokenRefreshResponse, Error>?
+
+    // MARK: - Call Tracking
 
     var fetchApiTokenCallCount = 0
     var fetchLiveKitTokenCallCount = 0
+    var loginWithKakaoCallCount = 0
+    var refreshTokenCallCount = 0
+    var logoutCallCount = 0
+
     var lastRoomName: String?
+    var lastKakaoAccessToken: String?
+    var lastUserType: UserType?
+
+    // MARK: - State
+
+    private(set) var isLoggedIn: Bool = false
+
+    // MARK: - AuthServiceProtocol
 
     func fetchApiToken() async throws -> String {
         fetchApiTokenCallCount += 1
@@ -28,5 +55,85 @@ final class MockAuthService: AuthServiceProtocol {
         case .failure(let error):
             throw error
         }
+    }
+
+    func loginWithKakao(kakaoAccessToken: String, userType: UserType) async throws -> AuthResponse {
+        loginWithKakaoCallCount += 1
+        lastKakaoAccessToken = kakaoAccessToken
+        lastUserType = userType
+
+        if let result = loginWithKakaoResult {
+            switch result {
+            case .success(let response):
+                isLoggedIn = true
+                return response
+            case .failure(let error):
+                throw error
+            }
+        }
+
+        // 기본 mock 응답
+        let mockResponse = AuthResponse(
+            accessToken: "mock-access-token",
+            refreshToken: "mock-refresh-token",
+            expiresIn: 3600,
+            user: UserMeResponse(
+                id: "mock-user-id",
+                kakaoId: "mock-kakao-id",
+                email: "mock@test.com",
+                nickname: "MockUser",
+                profileImageUrl: nil,
+                userType: userType,
+                createdAt: Date(),
+                guardianInfo: nil,
+                wardInfo: nil
+            )
+        )
+        isLoggedIn = true
+        return mockResponse
+    }
+
+    func refreshToken() async throws -> TokenRefreshResponse {
+        refreshTokenCallCount += 1
+
+        if let result = refreshTokenResult {
+            switch result {
+            case .success(let response):
+                return response
+            case .failure(let error):
+                throw error
+            }
+        }
+
+        // 기본 mock 응답
+        return TokenRefreshResponse(
+            accessToken: "mock-refreshed-access-token",
+            refreshToken: "mock-refreshed-refresh-token",
+            expiresIn: 3600
+        )
+    }
+
+    func logout() async {
+        logoutCallCount += 1
+        isLoggedIn = false
+    }
+
+    // MARK: - Test Helpers
+
+    func reset() {
+        fetchApiTokenCallCount = 0
+        fetchLiveKitTokenCallCount = 0
+        loginWithKakaoCallCount = 0
+        refreshTokenCallCount = 0
+        logoutCallCount = 0
+        lastRoomName = nil
+        lastKakaoAccessToken = nil
+        lastUserType = nil
+        isLoggedIn = false
+
+        fetchApiTokenResult = .success("mock-api-token")
+        fetchLiveKitTokenResult = .success("mock-livekit-token")
+        loginWithKakaoResult = nil
+        refreshTokenResult = nil
     }
 }

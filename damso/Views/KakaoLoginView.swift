@@ -34,7 +34,12 @@ struct KakaoLoginView: View {
                     // Kakao login button
                     Button(action: {
                         Task {
-                            await kakaoAuth.login()
+                            do {
+                                let _ = try await kakaoAuth.login()
+                                // 로그인 성공 - isLoggedIn이 자동으로 true로 변경됨
+                            } catch {
+                                // 에러는 kakaoAuth.errorMessage에 이미 저장됨
+                            }
                         }
                     }) {
                         HStack(spacing: 12) {

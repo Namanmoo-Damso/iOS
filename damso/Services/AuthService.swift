@@ -1,5 +1,46 @@
+//
+//  AuthService.swift
+//  damso
+//
+//  Created by Claude Code on 2024-12-29.
+//
+
 import Foundation
 import Combine
+
+enum AuthError: LocalizedError {
+    case missingAuthToken
+    case invalidResponse
+    case httpStatus(code: Int, body: String)
+    case missingToken
+    case networkError(String)
+    case decodingError(String)
+    case unauthorized
+
+    var errorDescription: String? {
+        switch self {
+        case .missingAuthToken:
+            return "인증 토큰이 없습니다."
+        case .invalidResponse:
+            return "잘못된 응답입니다."
+        case let .httpStatus(code, body):
+            if body.isEmpty {
+                return "API 요청 실패 (상태 코드: \(code))"
+            }
+            return "API 요청 실패 (\(code)): \(body)"
+        case .missingToken:
+            return "응답에 토큰이 없습니다."
+        case let .networkError(msg):
+            return "네트워크 오류: \(msg)"
+        case let .decodingError(msg):
+            return "디코딩 오류: \(msg)"
+        case .unauthorized:
+            return "인증이 만료되었습니다. 다시 로그인해주세요."
+        }
+    }
+}
+
+// MARK: - Legacy TokenError (호환성 유지)
 
 enum TokenError: LocalizedError {
     case missingAuthToken
@@ -27,12 +68,18 @@ enum TokenError: LocalizedError {
     }
 }
 
+// MARK: - AuthService
+
+@MainActor
 final class AuthService: AuthServiceProtocol {
-    private let authTokenKey = "authToken"
+
+    // MARK: - Properties
+
+    private let legacyAuthTokenKey = "authToken"
     private let identityKey = "user_identity"
     private let apnsKey = "cached_apns_token"
     private let voipKey = "cached_voip_token"
-    
+
     private var apnsEnv: String {
         #if DEBUG
         return "sandbox"
@@ -40,14 +87,145 @@ final class AuthService: AuthServiceProtocol {
         return "prod"
         #endif
     }
-    
-    private func debugLog(_ message: String) {
-        #if DEBUG
-        print("[AuthService] \(message)")
-        #endif
+
+    /// 현재 로그인 상태
+    var isLoggedIn: Bool {
+        TokenManager.shared.hasTokens
     }
-    
-    // 익명 인증 토큰 발급
+
+    // MARK: - Kakao Login + JWT
+
+    /// 카카오 로그인 + 서버 JWT 발급
+    func loginWithKakao(kakaoAccessToken: String, userType: UserType) async throws -> AuthResponse {
+        guard let url = URL(string: "\(AppConfig.apiBaseURL)/v1/auth/kakao") else {
+            throw AuthError.networkError("Invalid auth URL")
+        }
+
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 15)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let body: [String: Any] = [
+            "kakao_access_token": kakaoAccessToken,
+            "user_type": userType.rawValue
+        ]
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        } catch {
+            throw AuthError.networkError("Request body encoding failed")
+        }
+
+        let data: Data
+        let response: URLResponse
+
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch {
+            throw AuthError.networkError(error.localizedDescription)
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AuthError.invalidResponse
+        }
+
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            let bodyText = String(data: data, encoding: .utf8) ?? ""
+            throw AuthError.httpStatus(code: httpResponse.statusCode, body: bodyText)
+        }
+
+        do {
+            let authResponse = try JSONDecoder.apiDecoder.decode(AuthResponse.self, from: data)
+
+            // TokenManager에 토큰 저장
+            TokenManager.shared.saveTokens(
+                access: authResponse.accessToken,
+                refresh: authResponse.refreshToken
+            )
+
+            debugLog("Login successful, tokens saved")
+            return authResponse
+        } catch {
+            debugLog("Decoding error: \(error)")
+            throw AuthError.decodingError(error.localizedDescription)
+        }
+    }
+
+    /// 토큰 갱신
+    func refreshToken() async throws -> TokenRefreshResponse {
+        guard let refreshToken = TokenManager.shared.refreshToken else {
+            throw AuthError.missingAuthToken
+        }
+
+        guard let url = URL(string: "\(AppConfig.apiBaseURL)/v1/auth/refresh") else {
+            throw AuthError.networkError("Invalid refresh URL")
+        }
+
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 10)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let body: [String: Any] = [
+            "refresh_token": refreshToken
+        ]
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        } catch {
+            throw AuthError.networkError("Request body encoding failed")
+        }
+
+        let data: Data
+        let response: URLResponse
+
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch {
+            throw AuthError.networkError(error.localizedDescription)
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AuthError.invalidResponse
+        }
+
+        if httpResponse.statusCode == 401 {
+            // Refresh token도 만료됨 - 로그아웃 처리
+            await logout()
+            throw AuthError.unauthorized
+        }
+
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            let bodyText = String(data: data, encoding: .utf8) ?? ""
+            throw AuthError.httpStatus(code: httpResponse.statusCode, body: bodyText)
+        }
+
+        do {
+            let tokenResponse = try JSONDecoder.apiDecoder.decode(TokenRefreshResponse.self, from: data)
+
+            // 새 토큰 저장
+            TokenManager.shared.saveTokens(
+                access: tokenResponse.accessToken,
+                refresh: tokenResponse.refreshToken
+            )
+
+            debugLog("Token refreshed successfully")
+            return tokenResponse
+        } catch {
+            throw AuthError.decodingError(error.localizedDescription)
+        }
+    }
+
+    /// 로그아웃
+    func logout() async {
+        TokenManager.shared.clearTokens()
+        UserDefaults.standard.removeObject(forKey: legacyAuthTokenKey)
+        debugLog("Logged out, all tokens cleared")
+    }
+
+    // MARK: - Legacy Methods (익명 인증 - 기존 호환성)
+
     func fetchApiToken() async throws(TokenError) -> String {
         let identity = stableIdentity()
         guard let url = URL(string: "\(AppConfig.apiBaseURL)/v1/auth/anonymous") else {
@@ -57,10 +235,10 @@ final class AuthService: AuthServiceProtocol {
         var req = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 10)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
+
         let data: Data
         let response: URLResponse
-        
+
         do {
             req.httpBody = try JSONSerialization.data(withJSONObject: [
                 "identity": identity,
@@ -70,20 +248,20 @@ final class AuthService: AuthServiceProtocol {
         } catch {
             throw .networkError(error.localizedDescription)
         }
-        
+
         if let httpResponse = response as? HTTPURLResponse {
             if !(200..<300).contains(httpResponse.statusCode) {
                 let bodyText = String(data: data, encoding: .utf8) ?? ""
                 throw TokenError.httpStatus(code: httpResponse.statusCode, body: bodyText)
             }
         }
-        
+
         do {
             guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let token = json["accessToken"] as? String else {
                 throw TokenError.missingToken
             }
-            UserDefaults.standard.set(token, forKey: authTokenKey)
+            UserDefaults.standard.set(token, forKey: legacyAuthTokenKey)
             debugLog("API token stored")
             return token
         } catch {
@@ -91,16 +269,21 @@ final class AuthService: AuthServiceProtocol {
             throw .networkError("JSON Parsing Error")
         }
     }
-    
-    // LiveKit 접속용 토큰 발급
-    func fetchLiveKitToken(roomName: String) async throws(TokenError) -> String {
-        var authToken = UserDefaults.standard.string(forKey: authTokenKey)
-        if authToken == nil || authToken?.isEmpty == true {
-            authToken = try await fetchApiToken()
-        }
 
-        guard let token = authToken else {
-            throw .missingAuthToken
+    func fetchLiveKitToken(roomName: String) async throws(TokenError) -> String {
+        // JWT 토큰이 있으면 JWT 사용, 없으면 익명 토큰 사용
+        let authToken: String
+        if let jwtToken = TokenManager.shared.accessToken {
+            authToken = jwtToken
+        } else {
+            var legacyToken = UserDefaults.standard.string(forKey: legacyAuthTokenKey)
+            if legacyToken == nil || legacyToken?.isEmpty == true {
+                legacyToken = try await fetchApiToken()
+            }
+            guard let token = legacyToken else {
+                throw .missingAuthToken
+            }
+            authToken = token
         }
 
         guard let tokenEndpoint = URL(string: "\(AppConfig.apiBaseURL)/v1/rtc/token") else {
@@ -111,12 +294,12 @@ final class AuthService: AuthServiceProtocol {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        
+        request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+
         let identity = stableIdentity()
         let cachedApns = UserDefaults.standard.string(forKey: apnsKey)
         let cachedVoip = UserDefaults.standard.string(forKey: voipKey)
-        
+
         let supportsCallKit = resolveCallCapability() == .callKit
 
         var body: [String: Any] = [
@@ -129,42 +312,52 @@ final class AuthService: AuthServiceProtocol {
             "supportsCallKit": supportsCallKit
         ]
 
-        // Swift 6 Shorthand if let
         if let cachedApns, !cachedApns.isEmpty {
             body["apnsToken"] = cachedApns
         }
-        // WiFi-only iPad는 voipToken 전송하지 않음
         if supportsCallKit, let cachedVoip, !cachedVoip.isEmpty {
             body["voipToken"] = cachedVoip
         }
-        
+
         let data: Data
         let response: URLResponse
-        
+
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
             (data, response) = try await URLSession.shared.data(for: request)
         } catch {
-             throw .networkError(error.localizedDescription)
+            throw .networkError(error.localizedDescription)
         }
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw TokenError.invalidResponse
         }
-        
+
         if httpResponse.statusCode == 401 {
-            UserDefaults.standard.removeObject(forKey: authTokenKey)
+            // JWT 토큰이 만료되었을 수 있음 - 갱신 시도
+            if TokenManager.shared.hasTokens {
+                do {
+                    _ = try await refreshToken()
+                    // 재시도
+                    return try await fetchLiveKitToken(roomName: roomName)
+                } catch {
+                    debugLog("Token refresh failed: \(error)")
+                }
+            }
+            UserDefaults.standard.removeObject(forKey: legacyAuthTokenKey)
             throw TokenError.httpStatus(code: 401, body: "Unauthorized - Token might be expired")
         }
-        
+
         guard (200..<300).contains(httpResponse.statusCode) else {
             let body = String(data: data, encoding: .utf8) ?? ""
             throw TokenError.httpStatus(code: httpResponse.statusCode, body: body)
         }
-        
+
         return try parseToken(from: data)
     }
-    
+
+    // MARK: - Private Helpers
+
     private func parseToken(from data: Data) throws(TokenError) -> String {
         if let raw = String(data: data, encoding: .utf8) {
             let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -172,36 +365,36 @@ final class AuthService: AuthServiceProtocol {
                 return trimmed.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
             }
         }
-        
+
         struct TokenEnvelope: Decodable {
             let token: String?
             let accessToken: String?
             let data: Nested?
             let result: Nested?
-            
+
             struct Nested: Decodable {
                 let token: String?
                 let accessToken: String?
             }
         }
-        
+
         let response: TokenEnvelope
         do {
             response = try JSONDecoder().decode(TokenEnvelope.self, from: data)
         } catch {
             throw .networkError("JSON Decode Failed")
         }
-        
+
         if let t = response.token { return t }
         if let t = response.accessToken { return t }
         if let t = response.data?.token { return t }
         if let t = response.data?.accessToken { return t }
         if let t = response.result?.token { return t }
         if let t = response.result?.accessToken { return t }
-        
+
         throw TokenError.missingToken
     }
-    
+
     private func stableIdentity() -> String {
         if let stored = UserDefaults.standard.string(forKey: identityKey) {
             return stored
@@ -210,5 +403,10 @@ final class AuthService: AuthServiceProtocol {
         UserDefaults.standard.set(newIdentity, forKey: identityKey)
         return newIdentity
     }
-}
 
+    private func debugLog(_ message: String) {
+        #if DEBUG
+        print("[AuthService] \(message)")
+        #endif
+    }
+}
