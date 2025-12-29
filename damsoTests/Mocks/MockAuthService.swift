@@ -17,6 +17,7 @@ final class MockAuthService: AuthServiceProtocol {
     var fetchLiveKitTokenResult: Result<String, Error> = .success("mock-livekit-token")
     var loginWithKakaoResult: Result<AuthResponse, Error>?
     var refreshTokenResult: Result<TokenRefreshResponse, Error>?
+    var getMeResult: Result<UserMeResponse, Error>?
 
     // MARK: - Call Tracking
 
@@ -25,6 +26,7 @@ final class MockAuthService: AuthServiceProtocol {
     var loginWithKakaoCallCount = 0
     var refreshTokenCallCount = 0
     var logoutCallCount = 0
+    var getMeCallCount = 0
 
     var lastRoomName: String?
     var lastKakaoAccessToken: String?
@@ -118,6 +120,32 @@ final class MockAuthService: AuthServiceProtocol {
         isLoggedIn = false
     }
 
+    func getMe() async throws -> UserMeResponse {
+        getMeCallCount += 1
+
+        if let result = getMeResult {
+            switch result {
+            case .success(let response):
+                return response
+            case .failure(let error):
+                throw error
+            }
+        }
+
+        // 기본 mock 응답
+        return UserMeResponse(
+            id: "mock-user-id",
+            kakaoId: "mock-kakao-id",
+            email: "mock@test.com",
+            nickname: "MockUser",
+            profileImageUrl: nil,
+            userType: .guardian,
+            createdAt: Date(),
+            guardianInfo: nil,
+            wardInfo: nil
+        )
+    }
+
     // MARK: - Test Helpers
 
     func reset() {
@@ -126,6 +154,7 @@ final class MockAuthService: AuthServiceProtocol {
         loginWithKakaoCallCount = 0
         refreshTokenCallCount = 0
         logoutCallCount = 0
+        getMeCallCount = 0
         lastRoomName = nil
         lastKakaoAccessToken = nil
         lastUserType = nil
@@ -135,5 +164,6 @@ final class MockAuthService: AuthServiceProtocol {
         fetchLiveKitTokenResult = .success("mock-livekit-token")
         loginWithKakaoResult = nil
         refreshTokenResult = nil
+        getMeResult = nil
     }
 }

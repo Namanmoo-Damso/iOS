@@ -31,4 +31,8 @@ protocol AuthServiceProtocol {
 
     /// 현재 로그인 상태 확인
     var isLoggedIn: Bool { get }
+
+    /// 현재 사용자 정보 조회
+    /// - Returns: 사용자 정보
+    func getMe() async throws -> UserMeResponse
 }
