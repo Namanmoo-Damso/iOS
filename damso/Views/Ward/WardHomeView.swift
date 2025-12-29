@@ -56,6 +56,11 @@ struct WardHomeView: View {
                 .padding(.top)
             }
             .background(Color(.systemGroupedBackground))
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    EmergencyButton()
+                }
+            }
             .fullScreenCover(isPresented: $showCallView) {
                 // 영상통화 화면 (통화 종료 시 자동으로 홈으로 복귀)
                 LiveKitRoomView(
