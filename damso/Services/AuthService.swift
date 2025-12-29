@@ -271,6 +271,65 @@ final class AuthService: AuthServiceProtocol {
         }
     }
 
+    /// 보호자 등록
+    func registerGuardian(wardEmail: String, wardPhoneNumber: String) async throws -> GuardianRegistrationResponse {
+        guard let accessToken = TokenManager.shared.accessToken else {
+            throw AuthError.missingAuthToken
+        }
+
+        guard let url = URL(string: "\(AppConfig.apiBaseURL)/v1/users/register/guardian") else {
+            throw AuthError.networkError("Invalid registration URL")
+        }
+
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: 15)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+
+        let body: [String: Any] = [
+            "ward_email": wardEmail,
+            "ward_phone_number": wardPhoneNumber
+        ]
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        } catch {
+            throw AuthError.networkError("Request body encoding failed")
+        }
+
+        let data: Data
+        let response: URLResponse
+
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch {
+            throw AuthError.networkError(error.localizedDescription)
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AuthError.invalidResponse
+        }
+
+        if httpResponse.statusCode == 401 {
+            throw AuthError.unauthorized
+        }
+
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            let bodyText = String(data: data, encoding: .utf8) ?? ""
+            throw AuthError.httpStatus(code: httpResponse.statusCode, body: bodyText)
+        }
+
+        do {
+            let registrationResponse = try JSONDecoder.apiDecoder.decode(GuardianRegistrationResponse.self, from: data)
+            debugLog("Guardian registered: \(registrationResponse.guardianId)")
+            return registrationResponse
+        } catch {
+            debugLog("Decoding error: \(error)")
+            throw AuthError.decodingError(error.localizedDescription)
+        }
+    }
+
     // MARK: - Legacy Methods (익명 인증 - 기존 호환성)
 
     func fetchApiToken() async throws(TokenError) -> String {

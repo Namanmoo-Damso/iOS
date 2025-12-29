@@ -35,4 +35,11 @@ protocol AuthServiceProtocol {
     /// 현재 사용자 정보 조회
     /// - Returns: 사용자 정보
     func getMe() async throws -> UserMeResponse
+
+    /// 보호자 등록
+    /// - Parameters:
+    ///   - wardEmail: 피보호자 이메일
+    ///   - wardPhoneNumber: 피보호자 전화번호
+    /// - Returns: 등록 응답
+    func registerGuardian(wardEmail: String, wardPhoneNumber: String) async throws -> GuardianRegistrationResponse
 }
