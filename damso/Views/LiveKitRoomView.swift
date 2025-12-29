@@ -3,6 +3,7 @@ import SwiftUI
 import LiveKit
 
 struct LiveKitRoomView: View {
+    @Environment(\.dismiss) private var dismiss
     @ObservedObject var viewModel: AppLiveKitViewModel
     @ObservedObject private var networkMonitor = NetworkMonitor.shared
 
@@ -12,8 +13,12 @@ struct LiveKitRoomView: View {
     @State private var pendingIncomingCall: Bool = false
     @State private var showFullScreenCall = false
 
-    init(viewModel: AppLiveKitViewModel) {
+    /// 통화 종료 후 자동으로 화면을 닫을지 여부 (fullScreenCover로 표시된 경우)
+    var dismissOnCallEnd: Bool = false
+
+    init(viewModel: AppLiveKitViewModel, dismissOnCallEnd: Bool = false) {
         self.viewModel = viewModel
+        self.dismissOnCallEnd = dismissOnCallEnd
     }
 
     var body: some View {
@@ -69,6 +74,10 @@ struct LiveKitRoomView: View {
                 showFullScreenCall = true
             } else {
                 showFullScreenCall = false
+                // 통화 종료 후 화면 닫기 (fullScreenCover로 표시된 경우)
+                if dismissOnCallEnd {
+                    dismiss()
+                }
             }
         }
         .onChange(of: networkMonitor.isConnected) { _, isConnected in
