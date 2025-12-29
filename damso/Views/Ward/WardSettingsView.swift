@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import CoreLocation
 
 /// 어르신 설정 화면
 struct WardSettingsView: View {
@@ -15,6 +16,9 @@ struct WardSettingsView: View {
     @AppStorage("callVolume") private var callVolume = 0.7
     @AppStorage("weeklyCallCount") private var weeklyCallCount = 3
     @AppStorage("callDuration") private var callDuration = 15
+    @AppStorage("locationTrackingEnabled") private var locationTrackingEnabled = true
+
+    @StateObject private var locationService = LocationService.shared
 
     @State private var showLogoutAlert = false
     @State private var showWithdrawAlert = false
@@ -33,6 +37,9 @@ struct WardSettingsView: View {
 
                 // 통화 설정
                 callSettingsSection
+
+                // 위치 설정
+                locationSection
 
                 // 나의 정보
                 myInfoSection
@@ -154,6 +161,64 @@ struct WardSettingsView: View {
                 }
             }
         }
+    }
+
+    // MARK: - 위치 설정 섹션
+
+    private var locationSection: some View {
+        Section {
+            Toggle(isOn: $locationTrackingEnabled) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("위치 공유")
+                        .font(.body)
+
+                    Text("보호자에게 현재 위치를 공유합니다")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .onChange(of: locationTrackingEnabled) { _, newValue in
+                if newValue {
+                    locationService.startTracking()
+                } else {
+                    locationService.stopTracking()
+                }
+            }
+
+            // 위치 권한 상태 표시
+            HStack {
+                Text("위치 권한")
+                Spacer()
+                locationAuthStatusText
+            }
+        } header: {
+            Text("위치 설정")
+        } footer: {
+            Text("위치 정보는 보호자에게만 공유되며, 안전을 위해 사용됩니다.")
+        }
+    }
+
+    private var locationAuthStatusText: some View {
+        Group {
+            switch locationService.authorizationStatus {
+            case .authorizedAlways:
+                Text("항상 허용")
+                    .foregroundColor(.green)
+            case .authorizedWhenInUse:
+                Text("앱 사용 중 허용")
+                    .foregroundColor(.orange)
+            case .denied, .restricted:
+                Text("거부됨")
+                    .foregroundColor(.red)
+            case .notDetermined:
+                Text("설정 필요")
+                    .foregroundColor(.secondary)
+            @unknown default:
+                Text("알 수 없음")
+                    .foregroundColor(.secondary)
+            }
+        }
+        .font(.subheadline)
     }
 
     // MARK: - 나의 정보 섹션
