@@ -56,9 +56,12 @@ struct WardHomeView: View {
             }
             .background(Color(.systemGroupedBackground))
             .fullScreenCover(isPresented: $showCallView) {
-                // 영상통화 화면
-                LiveKitRoomView(viewModel: DependencyContainer.shared.makeLiveKitViewModel())
-                    .environmentObject(appState)
+                // 영상통화 화면 (통화 종료 시 자동으로 홈으로 복귀)
+                LiveKitRoomView(
+                    viewModel: DependencyContainer.shared.makeLiveKitViewModel(),
+                    dismissOnCallEnd: true
+                )
+                .environmentObject(appState)
             }
         }
     }
