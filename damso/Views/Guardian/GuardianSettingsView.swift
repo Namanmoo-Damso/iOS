@@ -15,6 +15,8 @@ struct GuardianSettingsView: View {
     @State private var showLogoutAlert = false
     @State private var showWithdrawAlert = false
     @State private var showUnlinkAlert = false
+    @State private var isWithdrawing = false
+    @State private var withdrawError: String?
 
     var body: some View {
         NavigationStack {
@@ -47,10 +49,33 @@ struct GuardianSettingsView: View {
         .alert("회원탈퇴", isPresented: $showWithdrawAlert) {
             Button("취소", role: .cancel) {}
             Button("탈퇴", role: .destructive) {
-                // TODO: 회원탈퇴 API 호출
+                Task {
+                    isWithdrawing = true
+                    do {
+                        try await appState.withdraw()
+                    } catch {
+                        withdrawError = "탈퇴에 실패했습니다. 다시 시도해주세요."
+                    }
+                    isWithdrawing = false
+                }
             }
         } message: {
             Text("정말 탈퇴 하시겠습니까?\n모든 데이터가 삭제됩니다.")
+        }
+        .alert("오류", isPresented: .init(
+            get: { withdrawError != nil },
+            set: { if !$0 { withdrawError = nil } }
+        )) {
+            Button("확인", role: .cancel) {}
+        } message: {
+            Text(withdrawError ?? "")
+        }
+        .overlay {
+            if isWithdrawing {
+                ProgressView("탈퇴 처리 중...")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.black.opacity(0.3))
+            }
         }
         .alert("연결 해제", isPresented: $showUnlinkAlert) {
             Button("취소", role: .cancel) {}
