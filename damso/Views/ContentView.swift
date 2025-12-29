@@ -94,7 +94,7 @@ struct ContentView: View {
                 .transition(.move(edge: .trailing))
 
             case .main:
-                LiveKitRoomView(viewModel: viewModel)
+                mainView
                     .transition(.move(edge: .trailing))
                     .environmentObject(appState)
             }
@@ -122,6 +122,18 @@ struct ContentView: View {
             }
         } message: {
             Text(matchFailureMessage ?? "등록된 보호자 정보가 없습니다.\n보호자에게 먼저 앱에서 회원가입을 요청해주세요.")
+        }
+    }
+
+    // MARK: - Computed Views
+
+    @ViewBuilder
+    private var mainView: some View {
+        if appState.currentUser?.userType == .ward {
+            WardHomeView()
+        } else {
+            // 보호자는 기존 LiveKitRoomView 사용 (추후 GuardianHomeView로 변경)
+            LiveKitRoomView(viewModel: viewModel)
         }
     }
 
