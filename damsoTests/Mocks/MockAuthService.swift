@@ -94,7 +94,9 @@ final class MockAuthService: AuthServiceProtocol {
                 createdAt: Date(),
                 guardianInfo: nil,
                 wardInfo: nil
-            )
+            ),
+            matchStatus: userType == .ward ? .matched : nil,
+            matchMessage: nil
         )
         isLoggedIn = true
         return mockResponse
