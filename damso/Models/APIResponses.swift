@@ -82,6 +82,13 @@ struct WardInfoResponse: Codable {
 
 // MARK: - 인증 관련 응답
 
+/// 매칭 상태
+enum MatchStatus: String, Codable {
+    case matched = "matched"
+    case notMatched = "not_matched"
+    case pending = "pending"
+}
+
 /// POST /auth/kakao 응답
 struct AuthResponse: Codable {
     let accessToken: String
@@ -89,11 +96,19 @@ struct AuthResponse: Codable {
     let expiresIn: Int
     let user: UserMeResponse
 
+    /// 어르신 자동 매칭 상태 (어르신 로그인 시에만 사용)
+    let matchStatus: MatchStatus?
+
+    /// 매칭 관련 메시지
+    let matchMessage: String?
+
     enum CodingKeys: String, CodingKey {
         case accessToken = "access_token"
         case refreshToken = "refresh_token"
         case expiresIn = "expires_in"
         case user
+        case matchStatus = "match_status"
+        case matchMessage = "match_message"
     }
 }
 
