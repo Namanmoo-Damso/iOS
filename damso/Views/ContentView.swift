@@ -37,6 +37,8 @@ struct ContentView: View {
     @State private var selectedUserType: UserType?
     @State private var kakaoUserInfo: KakaoUserInfo?
     @State private var registeredWardEmail: String?
+    @State private var showMatchFailureAlert = false
+    @State private var matchFailureMessage: String?
 
     var body: some View {
         Group {
@@ -114,6 +116,13 @@ struct ContentView: View {
                 navigationState = .userTypeSelection
             }
         }
+        .alert("보호자 정보 없음", isPresented: $showMatchFailureAlert) {
+            Button("확인") {
+                navigationState = .userTypeSelection
+            }
+        } message: {
+            Text(matchFailureMessage ?? "등록된 보호자 정보가 없습니다.\n보호자에게 먼저 앱에서 회원가입을 요청해주세요.")
+        }
     }
 
     // MARK: - Private Methods
@@ -149,19 +158,45 @@ struct ContentView: View {
                     userType: userType
                 )
 
-                // AppState 업데이트
-                appState.didLogin(user: authResponse.user)
-
-                // 보호자인 경우 등록 화면으로, 피보호자는 메인으로
-                if userType == .guardian {
-                    navigationState = .guardianRegistration
+                // 어르신인 경우 매칭 상태 확인
+                if userType == .ward {
+                    handleWardLoginResponse(authResponse)
                 } else {
-                    navigationState = .main
+                    // 보호자 로그인 처리
+                    appState.didLogin(user: authResponse.user)
+                    navigationState = .guardianRegistration
                 }
             } catch {
                 print("[ContentView] Login failed: \(error)")
                 // 에러 처리 - 다시 타입 선택으로
             }
+        }
+    }
+
+    private func handleWardLoginResponse(_ authResponse: AuthResponse) {
+        // 매칭 상태 확인
+        guard let matchStatus = authResponse.matchStatus else {
+            // matchStatus가 없으면 매칭 성공으로 간주
+            appState.didLogin(user: authResponse.user)
+            navigationState = .main
+            return
+        }
+
+        switch matchStatus {
+        case .matched:
+            // 매칭 성공 - 메인으로 이동
+            appState.didLogin(user: authResponse.user)
+            navigationState = .main
+
+        case .notMatched:
+            // 매칭 실패 - 토큰 저장하지 않고 알림 표시
+            matchFailureMessage = authResponse.matchMessage
+            showMatchFailureAlert = true
+
+        case .pending:
+            // 대기 중 - 일단 메인으로 이동 (추후 처리)
+            appState.didLogin(user: authResponse.user)
+            navigationState = .main
         }
     }
 
