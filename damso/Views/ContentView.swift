@@ -132,8 +132,8 @@ struct ContentView: View {
         if appState.currentUser?.userType == .ward {
             WardHomeView()
         } else {
-            // 보호자는 기존 LiveKitRoomView 사용 (추후 GuardianHomeView로 변경)
-            LiveKitRoomView(viewModel: viewModel)
+            // 보호자 대시보드
+            GuardianHomeView()
         }
     }
 
