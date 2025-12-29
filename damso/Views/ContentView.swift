@@ -10,13 +10,22 @@ import SwiftUI
 import Combine
 import LiveKit
 
+/// 초대 정보
+struct InviteInfo: Equatable {
+    let guardianId: String
+    let guardianName: String
+    let wardEmail: String
+}
+
 /// 앱 네비게이션 상태
 enum AppNavigationState: Equatable {
-    case splash            // 로딩 중
-    case serverSelection   // 서버 선택
-    case userTypeSelection // 사용자 타입 선택
-    case login(UserType)   // 카카오 로그인 (선택된 타입 포함)
-    case main              // 메인 화면
+    case splash                       // 로딩 중
+    case serverSelection              // 서버 선택
+    case userTypeSelection            // 사용자 타입 선택
+    case login(UserType)              // 카카오 로그인 (선택된 타입 포함)
+    case guardianRegistration         // 보호자 등록 폼
+    case inviteCompletion(InviteInfo) // 초대 완료 화면
+    case main                         // 메인 화면
 }
 
 struct ContentView: View {
@@ -26,6 +35,8 @@ struct ContentView: View {
 
     @State private var navigationState: AppNavigationState = .splash
     @State private var selectedUserType: UserType?
+    @State private var kakaoUserInfo: KakaoUserInfo?
+    @State private var registeredWardEmail: String?
 
     var body: some View {
         Group {
@@ -53,6 +64,31 @@ struct ContentView: View {
                     get: { false },
                     set: { _ in handleLoginSuccess(userType: userType) }
                 ))
+                .transition(.move(edge: .trailing))
+
+            case .guardianRegistration:
+                if let userInfo = kakaoUserInfo {
+                    GuardianRegistrationView(
+                        kakaoUserInfo: userInfo,
+                        onRegistrationComplete: { wardEmail in
+                            handleGuardianRegistrationComplete(wardEmail: wardEmail)
+                        },
+                        onBack: {
+                            navigationState = .userTypeSelection
+                        }
+                    )
+                    .transition(.move(edge: .trailing))
+                }
+
+            case .inviteCompletion(let inviteInfo):
+                InviteCompletionView(
+                    guardianId: inviteInfo.guardianId,
+                    guardianName: inviteInfo.guardianName,
+                    wardEmail: inviteInfo.wardEmail,
+                    onComplete: {
+                        navigationState = .main
+                    }
+                )
                 .transition(.move(edge: .trailing))
 
             case .main:
@@ -103,6 +139,9 @@ struct ContentView: View {
                     return
                 }
 
+                // 카카오 사용자 정보 저장
+                kakaoUserInfo = kakaoResult.userInfo
+
                 // 서버에 카카오 토큰으로 JWT 발급 요청
                 let authService = AuthService()
                 let authResponse = try await authService.loginWithKakao(
@@ -112,12 +151,34 @@ struct ContentView: View {
 
                 // AppState 업데이트
                 appState.didLogin(user: authResponse.user)
-                navigationState = .main
+
+                // 보호자인 경우 등록 화면으로, 피보호자는 메인으로
+                if userType == .guardian {
+                    navigationState = .guardianRegistration
+                } else {
+                    navigationState = .main
+                }
             } catch {
                 print("[ContentView] Login failed: \(error)")
                 // 에러 처리 - 다시 타입 선택으로
             }
         }
+    }
+
+    private func handleGuardianRegistrationComplete(wardEmail: String) {
+        // 보호자 등록 완료 후 초대 화면으로
+        guard let user = appState.currentUser,
+              let userInfo = kakaoUserInfo else {
+            navigationState = .main
+            return
+        }
+
+        let inviteInfo = InviteInfo(
+            guardianId: user.id,
+            guardianName: userInfo.nickname ?? user.nickname,
+            wardEmail: wardEmail
+        )
+        navigationState = .inviteCompletion(inviteInfo)
     }
 }
 
