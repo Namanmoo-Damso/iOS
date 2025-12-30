@@ -15,9 +15,6 @@ struct GuardianRegistrationView: View {
     /// 카카오에서 가져온 사용자 정보
     let kakaoUserInfo: KakaoUserInfo
 
-    /// 신규 사용자 등록용 임시 토큰 (카카오 로그인 응답에서 받음)
-    let tempToken: String?
-
     /// 등록 완료 콜백 (wardEmail 전달)
     let onRegistrationComplete: (String) -> Void
 
@@ -42,12 +39,10 @@ struct GuardianRegistrationView: View {
 
     init(
         kakaoUserInfo: KakaoUserInfo,
-        tempToken: String? = nil,
         onRegistrationComplete: @escaping (String) -> Void,
         onBack: (() -> Void)? = nil
     ) {
         self.kakaoUserInfo = kakaoUserInfo
-        self.tempToken = tempToken
         self.onRegistrationComplete = onRegistrationComplete
         self.onBack = onBack
     }
@@ -353,8 +348,7 @@ struct GuardianRegistrationView: View {
             do {
                 let response = try await AuthService.shared.registerGuardian(
                     wardEmail: wardEmail,
-                    wardPhoneNumber: wardPhoneNumber.replacingOccurrences(of: "-", with: ""),
-                    tempToken: tempToken
+                    wardPhoneNumber: wardPhoneNumber.replacingOccurrences(of: "-", with: "")
                 )
 
                 // 응답에 user가 있으면 저장 (아직 didLogin 호출 안함 - Alert 먼저 표시)
