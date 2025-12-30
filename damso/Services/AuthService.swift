@@ -183,20 +183,16 @@ final class AuthService: AuthServiceProtocol {
                 Log.auth.d("- user.userType: \(user.userType?.rawValue ?? "nil")")
             }
 
-            // 신규 사용자가 아닌 경우에만 토큰 저장
-            if !authResponse.isNewUserFlag {
-                if let accessToken = authResponse.accessToken,
-                   let refreshToken = authResponse.refreshToken {
-                    TokenManager.shared.saveTokens(
-                        access: accessToken,
-                        refresh: refreshToken
-                    )
-                    Log.auth.i("Login successful, tokens saved")
-                } else {
-                    Log.auth.w("Login successful but missing tokens in response")
-                }
+            // 신규 사용자/기존 사용자 모두 토큰 저장
+            if let accessToken = authResponse.accessToken,
+               let refreshToken = authResponse.refreshToken {
+                TokenManager.shared.saveTokens(
+                    access: accessToken,
+                    refresh: refreshToken
+                )
+                Log.auth.i("Login successful, tokens saved (isNewUser: \(authResponse.isNewUserFlag))")
             } else {
-                Log.auth.i("New user detected, tempToken provided (registration required)")
+                Log.auth.w("Login successful but missing tokens in response")
             }
 
             return authResponse
@@ -389,15 +385,8 @@ final class AuthService: AuthServiceProtocol {
     /// - Parameters:
     ///   - wardEmail: 어르신 이메일
     ///   - wardPhoneNumber: 어르신 전화번호
-    ///   - tempToken: 신규 사용자 등록용 임시 토큰 (카카오 로그인 응답에서 받음)
-    func registerGuardian(wardEmail: String, wardPhoneNumber: String, tempToken: String? = nil) async throws -> GuardianRegistrationResponse {
-        // tempToken이 있으면 사용, 없으면 기존 accessToken 사용
-        let authToken: String
-        if let tempToken = tempToken {
-            authToken = tempToken
-        } else if let accessToken = TokenManager.shared.accessToken {
-            authToken = accessToken
-        } else {
+    func registerGuardian(wardEmail: String, wardPhoneNumber: String) async throws -> GuardianRegistrationResponse {
+        guard let authToken = TokenManager.shared.accessToken else {
             throw AuthError.missingAuthToken
         }
 

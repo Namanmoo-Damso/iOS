@@ -41,7 +41,6 @@ protocol AuthServiceProtocol {
     /// - Parameters:
     ///   - wardEmail: 피보호자 이메일
     ///   - wardPhoneNumber: 피보호자 전화번호
-    ///   - tempToken: 신규 사용자 등록용 임시 토큰 (선택)
     /// - Returns: 등록 응답
-    func registerGuardian(wardEmail: String, wardPhoneNumber: String, tempToken: String?) async throws -> GuardianRegistrationResponse
+    func registerGuardian(wardEmail: String, wardPhoneNumber: String) async throws -> GuardianRegistrationResponse
 }
