@@ -7,18 +7,9 @@
 
 import Foundation
 
-/// 사용자 정보 서비스 프로토콜
-protocol UserServiceProtocol {
-    /// 현재 사용자 정보 조회
-    func getMe() async throws -> UserMeResponse
-
-    /// 회원탈퇴
-    func deleteUser() async throws
-}
-
 /// 사용자 정보 관리 서비스
 @MainActor
-final class UserService: UserServiceProtocol {
+final class UserService: UserInfoProtocol {
 
     // MARK: - Singleton
 

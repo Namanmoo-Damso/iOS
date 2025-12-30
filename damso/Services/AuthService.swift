@@ -8,25 +8,10 @@
 import Foundation
 import Combine
 
-/// 인증 서비스 프로토콜
-protocol AuthenticationProtocol {
-    /// 카카오 로그인 + 서버 JWT 발급
-    func loginWithKakao(kakaoAccessToken: String, kakaoUserInfo: KakaoUserInfo?, userType: UserType?) async throws -> AuthResponse
-
-    /// 토큰 갱신
-    func refreshToken() async throws -> TokenRefreshResponse
-
-    /// 로그아웃
-    func logout() async
-
-    /// 현재 로그인 상태
-    var isLoggedIn: Bool { get }
-}
-
 // MARK: - AuthService
 
 @MainActor
-final class AuthService: AuthServiceProtocol, AuthenticationProtocol {
+final class AuthService: AuthServiceProtocol {
 
     // MARK: - Singleton
 

@@ -7,24 +7,14 @@
 
 import Foundation
 
-/// 인증 서비스 프로토콜
-protocol AuthServiceProtocol {
-    /// 익명 API 토큰 발급 (기존 호환성)
-    func fetchApiToken() async throws -> String
+// MARK: - 분리된 프로토콜 (ISP 원칙)
 
-    /// LiveKit 접속용 토큰 발급
-    func fetchLiveKitToken(roomName: String) async throws -> String
-
+/// 인증 전용 프로토콜
+protocol AuthenticationProtocol {
     /// 카카오 로그인 + 서버 JWT 발급
-    /// - Parameters:
-    ///   - kakaoAccessToken: 카카오 access token
-    ///   - kakaoUserInfo: 카카오 사용자 정보 (nickname, email 등)
-    ///   - userType: 사용자 타입 (nil이면 서버에서 null로 저장)
-    /// - Returns: 인증 응답 (access token, refresh token, user info)
     func loginWithKakao(kakaoAccessToken: String, kakaoUserInfo: KakaoUserInfo?, userType: UserType?) async throws -> AuthResponse
 
     /// 토큰 갱신
-    /// - Returns: 갱신된 토큰 정보
     func refreshToken() async throws -> TokenRefreshResponse
 
     /// 로그아웃 (토큰 삭제)
@@ -32,15 +22,34 @@ protocol AuthServiceProtocol {
 
     /// 현재 로그인 상태 확인
     var isLoggedIn: Bool { get }
+}
 
+/// 사용자 정보 프로토콜
+protocol UserInfoProtocol {
     /// 현재 사용자 정보 조회
-    /// - Returns: 사용자 정보
     func getMe() async throws -> UserMeResponse
 
+    /// 회원탈퇴
+    func deleteUser() async throws
+}
+
+/// 등록 프로토콜
+protocol RegistrationProtocol {
     /// 보호자 등록
-    /// - Parameters:
-    ///   - wardEmail: 피보호자 이메일
-    ///   - wardPhoneNumber: 피보호자 전화번호
-    /// - Returns: 등록 응답
     func registerGuardian(wardEmail: String, wardPhoneNumber: String) async throws -> GuardianRegistrationResponse
 }
+
+/// RTC 토큰 프로토콜
+protocol RTCTokenProtocol {
+    /// 익명 API 토큰 발급 (Legacy)
+    func fetchApiToken() async throws -> String
+
+    /// LiveKit 접속용 토큰 발급
+    func fetchLiveKitToken(roomName: String) async throws -> String
+}
+
+// MARK: - 통합 프로토콜 (기존 호환성 유지)
+
+/// 인증 서비스 통합 프로토콜
+/// 개별 프로토콜들의 합성으로 정의됨
+protocol AuthServiceProtocol: AuthenticationProtocol, UserInfoProtocol, RegistrationProtocol, RTCTokenProtocol {}
