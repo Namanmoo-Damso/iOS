@@ -79,22 +79,16 @@ final class AuthServiceTests: XCTestCase {
         // Given: TokenManager에 토큰이 없는 상태
         TokenManager.shared.clearTokens()
 
-        // When
-        let authService = AuthService()
-
-        // Then
-        XCTAssertFalse(authService.isLoggedIn)
+        // Then: 싱글톤 사용
+        XCTAssertFalse(AuthService.shared.isLoggedIn)
     }
 
     func test_authService_isLoggedIn_whenTokensExist() {
         // Given: TokenManager에 토큰이 있는 상태
         TokenManager.shared.saveTokens(access: "test-access", refresh: "test-refresh")
 
-        // When
-        let authService = AuthService()
-
-        // Then
-        XCTAssertTrue(authService.isLoggedIn)
+        // Then: 싱글톤 사용
+        XCTAssertTrue(AuthService.shared.isLoggedIn)
 
         // Cleanup
         TokenManager.shared.clearTokens()
@@ -103,14 +97,13 @@ final class AuthServiceTests: XCTestCase {
     func test_authService_logout_clearsTokens() async {
         // Given
         TokenManager.shared.saveTokens(access: "test-access", refresh: "test-refresh")
-        let authService = AuthService()
-        XCTAssertTrue(authService.isLoggedIn)
+        XCTAssertTrue(AuthService.shared.isLoggedIn)
 
         // When
-        await authService.logout()
+        await AuthService.shared.logout()
 
         // Then
-        XCTAssertFalse(authService.isLoggedIn)
+        XCTAssertFalse(AuthService.shared.isLoggedIn)
         XCTAssertNil(TokenManager.shared.accessToken)
         XCTAssertNil(TokenManager.shared.refreshToken)
     }
