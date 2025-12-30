@@ -50,7 +50,7 @@ struct GuardianProfileView: View {
                         .font(.title2)
                         .fontWeight(.semibold)
 
-                    Text(appState.currentUser?.userType.displayName ?? "보호자")
+                    Text(appState.currentUser?.userType?.displayName ?? "보호자")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
