@@ -7,15 +7,9 @@
 
 import Foundation
 
-/// 등록 서비스 프로토콜
-protocol RegistrationServiceProtocol {
-    /// 보호자 등록
-    func registerGuardian(wardEmail: String, wardPhoneNumber: String) async throws -> GuardianRegistrationResponse
-}
-
 /// 사용자 등록 관리 서비스
 @MainActor
-final class RegistrationService: RegistrationServiceProtocol {
+final class RegistrationService: RegistrationProtocol {
 
     // MARK: - Singleton
 
