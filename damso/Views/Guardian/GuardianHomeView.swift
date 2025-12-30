@@ -72,29 +72,44 @@ struct GuardianHomeView: View {
 
     private var statisticsSection: some View {
         HStack(spacing: 12) {
-            StatCard(
-                title: "총 대화 수",
-                value: "\(viewModel.totalCalls)",
-                change: viewModel.weeklyChange > 0 ? "+\(viewModel.weeklyChange)" : nil,
-                icon: "phone.fill",
-                color: .blue
-            )
+            NavigationLink {
+                StatisticsDetailView(statisticType: .totalCalls, viewModel: viewModel)
+            } label: {
+                StatCard(
+                    title: "총 대화 수",
+                    value: "\(viewModel.totalCalls)",
+                    change: viewModel.weeklyChange > 0 ? "+\(viewModel.weeklyChange)" : nil,
+                    icon: "phone.fill",
+                    color: .blue
+                )
+            }
+            .buttonStyle(.plain)
 
-            StatCard(
-                title: "평균 시간",
-                value: "\(viewModel.averageDuration)분",
-                subtitle: "대화당",
-                icon: "clock.fill",
-                color: .orange
-            )
+            NavigationLink {
+                StatisticsDetailView(statisticType: .averageDuration, viewModel: viewModel)
+            } label: {
+                StatCard(
+                    title: "평균 시간",
+                    value: "\(viewModel.averageDuration)분",
+                    subtitle: "대화당",
+                    icon: "clock.fill",
+                    color: .orange
+                )
+            }
+            .buttonStyle(.plain)
 
-            StatCard(
-                title: "전반적 기분",
-                value: viewModel.positiveMoodPercent >= 50 ? "긍정적" : "부정적",
-                subtitle: "\(viewModel.positiveMoodPercent)%",
-                icon: "face.smiling.fill",
-                color: viewModel.positiveMoodPercent >= 50 ? .green : .red
-            )
+            NavigationLink {
+                StatisticsDetailView(statisticType: .mood, viewModel: viewModel)
+            } label: {
+                StatCard(
+                    title: "전반적 기분",
+                    value: viewModel.positiveMoodPercent >= 50 ? "긍정적" : "부정적",
+                    subtitle: "\(viewModel.positiveMoodPercent)%",
+                    icon: "face.smiling.fill",
+                    color: viewModel.positiveMoodPercent >= 50 ? .green : .red
+                )
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -104,10 +119,14 @@ struct GuardianHomeView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("건강 알림")
                 .font(.headline)
-                .padding(.horizontal, 4)
 
             ForEach(viewModel.alerts) { alert in
-                AlertCard(alert: alert)
+                NavigationLink {
+                    AlertDetailView(alert: alert)
+                } label: {
+                    AlertCard(alert: alert)
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -128,7 +147,6 @@ struct GuardianHomeView: View {
                 }
                 .font(.subheadline)
             }
-            .padding(.horizontal, 4)
 
             if viewModel.recentCalls.isEmpty {
                 Text("아직 대화 기록이 없습니다")
@@ -137,21 +155,15 @@ struct GuardianHomeView: View {
                     .padding(.vertical, 40)
             } else {
                 ForEach(viewModel.recentCalls) { call in
-                    RecentCallCard(call: call)
+                    NavigationLink {
+                        CallDetailView(call: call)
+                    } label: {
+                        RecentCallCard(call: call)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
-    }
-}
-
-// MARK: - Placeholder for Call History
-
-struct CallHistoryListView: View {
-    @EnvironmentObject var appState: AppState
-
-    var body: some View {
-        Text("통화 기록 전체 목록")
-            .navigationTitle("통화 기록")
     }
 }
 

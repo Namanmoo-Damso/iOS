@@ -50,7 +50,7 @@ struct MyProfileView: View {
                         .font(.title2)
                         .fontWeight(.semibold)
 
-                    Text(appState.currentUser?.userType.displayName ?? "어르신")
+                    Text(appState.currentUser?.userType?.displayName ?? "어르신")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }

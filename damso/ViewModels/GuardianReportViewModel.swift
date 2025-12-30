@@ -27,12 +27,8 @@ final class GuardianReportViewModel: ObservableObject {
 
     // MARK: - Dependencies
 
-    private let authService: AuthService
-
-    // MARK: - Initialization
-
-    init(authService: AuthService = AuthService()) {
-        self.authService = authService
+    private var authService: AuthService {
+        AuthService.shared
     }
 
     // MARK: - Public Methods
