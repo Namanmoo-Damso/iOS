@@ -41,5 +41,18 @@
 	</array>
 	<key>KAKAO_NATIVE_APP_KEY</key>
 	<string>85bb4e3941d219d5c10b28ee5d2a3b99</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>kakaocdn.net</key>
+			<dict>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
 </dict>
 </plist>
