@@ -234,7 +234,7 @@ struct WardSettingsView: View {
                     Spacer()
 
                     if let user = appState.currentUser {
-                        Text(user.nickname)
+                        Text(user.nickname ?? "")
                             .foregroundColor(.secondary)
                     }
                 }
