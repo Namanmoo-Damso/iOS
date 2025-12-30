@@ -45,9 +45,6 @@ struct ContentView: View {
     @State private var showUserTypeMismatchAlert = false
     @State private var userTypeMismatchMessage: String?
 
-    // 앱 재시작 시 카카오 로그인 복원을 위한 키
-    private let pendingLoginUserTypeKey = UserDefaultsKeys.pendingLoginUserType
-
     var body: some View {
         Group {
             switch navigationState {
@@ -58,7 +55,7 @@ struct ContentView: View {
             case .serverSelection:
                 StartView(isServerSelected: Binding(
                     get: { false },
-                    set: { if $0 { navigationState = .userTypeSelection } }
+                    set: { if $0 { handleServerSelected() } }
                 ))
                 .transition(.move(edge: .leading))
 
@@ -171,7 +168,7 @@ struct ContentView: View {
         Log.ui.i("checkInitialState() 시작")
 
         // 대기 중인 로그인 상태 클리어
-        UserDefaults.standard.removeObject(forKey: pendingLoginUserTypeKey)
+        UserDefaults.standard.clearPendingLoginUserType()
 
         // 항상 서버 선택 화면(StartView)부터 시작
         Log.ui.i("서버 선택 화면으로 이동 (항상 StartView부터 시작)")
@@ -182,7 +179,7 @@ struct ContentView: View {
         Log.auth.i("handleLoginSuccess 호출됨 - userType: \(userType)")
 
         // 대기 중인 로그인 상태 클리어
-        UserDefaults.standard.removeObject(forKey: pendingLoginUserTypeKey)
+        UserDefaults.standard.clearPendingLoginUserType()
 
         // 카카오 로그인 성공 후 서버 인증 수행
         Task {
@@ -308,6 +305,21 @@ struct ContentView: View {
             Log.auth.i("매칭 대기 중 - 메인으로 이동")
             appState.didLogin(user: user)
             navigationState = .main
+        }
+    }
+
+    private func handleServerSelected() {
+        Task {
+            Log.ui.i("서버 선택 완료 - 인증 상태 확인 중...")
+            await appState.checkAuthStatus()
+
+            if appState.isAuthenticated {
+                Log.ui.i("자동 로그인 성공 - 메인으로 이동")
+                navigationState = .main
+            } else {
+                Log.ui.i("인증되지 않음 - 사용자 타입 선택으로 이동")
+                navigationState = .userTypeSelection
+            }
         }
     }
 

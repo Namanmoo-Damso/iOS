@@ -171,7 +171,7 @@ final class AuthService: AuthServiceProtocol {
     /// 로그아웃
     func logout() async {
         TokenManager.shared.clearTokens()
-        UserDefaults.standard.removeObject(forKey: UserDefaultsKeys.legacyAuthToken)
+        UserDefaults.standard.clearLegacyAuthToken()
         Log.auth.i("Logged out, all tokens cleared")
     }
 

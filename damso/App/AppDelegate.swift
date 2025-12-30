@@ -12,10 +12,6 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     let callManager = CallManager.shared
     var voipRegistry: PKPushRegistry?
 
-    private let identityKey = "user_identity"
-    private let apnsKey = "cached_apns_token"
-    private let voipKey = "cached_voip_token"
-
     var apnsEnv: String { resolveApnsEnv() }
     var bundleId: String { Bundle.main.bundleIdentifier ?? "unknown.bundle" }
     var expectedVoipTopic: String { "\(bundleId).voip" }
@@ -183,8 +179,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     // MARK: - Token Registration
 
     func registerCachedTokensIfAvailable() {
-        let apnsToken = UserDefaults.standard.string(forKey: apnsKey)
-        let voipToken = UserDefaults.standard.string(forKey: voipKey)
+        let apnsToken = UserDefaults.standard.cachedApnsToken
+        let voipToken = UserDefaults.standard.cachedVoipToken
         debugLog("cached tokens apns=\(summarizeToken(apnsToken)) voip=\(summarizeToken(voipToken))")
         if let apnsToken { diagLog("cached APNs token full=\(apnsToken)") }
         if let voipToken { diagLog("cached VoIP token full=\(voipToken)") }
@@ -194,11 +190,11 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     }
 
     private func stableIdentity() -> String {
-        if let stored = UserDefaults.standard.string(forKey: identityKey) {
+        if let stored = UserDefaults.standard.userIdentity {
             return stored
         }
         let newIdentity = "ios-\(UUID().uuidString)"
-        UserDefaults.standard.set(newIdentity, forKey: identityKey)
+        UserDefaults.standard.userIdentity = newIdentity
         return newIdentity
     }
 
@@ -221,15 +217,15 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         var currentVoip = voipToken
 
         if let newApns = apnsToken {
-            UserDefaults.standard.set(newApns, forKey: apnsKey)
+            UserDefaults.standard.cachedApnsToken = newApns
         } else {
-            currentApns = UserDefaults.standard.string(forKey: apnsKey)
+            currentApns = UserDefaults.standard.cachedApnsToken
         }
 
         if let newVoip = voipToken {
-            UserDefaults.standard.set(newVoip, forKey: voipKey)
+            UserDefaults.standard.cachedVoipToken = newVoip
         } else {
-            currentVoip = UserDefaults.standard.string(forKey: voipKey)
+            currentVoip = UserDefaults.standard.cachedVoipToken
         }
 
         let supportsCallKit = resolveCallCapability() == .callKit

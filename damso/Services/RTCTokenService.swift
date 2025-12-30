@@ -36,7 +36,7 @@ final class RTCTokenService: RTCTokenProtocol {
         if let jwtToken = TokenManager.shared.accessToken {
             authToken = jwtToken
         } else {
-            var legacyToken = UserDefaults.standard.string(forKey: UserDefaultsKeys.legacyAuthToken)
+            var legacyToken = UserDefaults.standard.legacyAuthToken
             if legacyToken == nil || legacyToken?.isEmpty == true {
                 legacyToken = try await fetchApiToken()
             }
@@ -57,8 +57,8 @@ final class RTCTokenService: RTCTokenProtocol {
         request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
 
         let identity = stableIdentity()
-        let cachedApns = UserDefaults.standard.string(forKey: UserDefaultsKeys.cachedApnsToken)
-        let cachedVoip = UserDefaults.standard.string(forKey: UserDefaultsKeys.cachedVoipToken)
+        let cachedApns = UserDefaults.standard.cachedApnsToken
+        let cachedVoip = UserDefaults.standard.cachedVoipToken
 
         let supportsCallKit = resolveCallCapability() == .callKit
 
@@ -104,7 +104,7 @@ final class RTCTokenService: RTCTokenProtocol {
                     Log.auth.e("Token refresh failed: \(error)")
                 }
             }
-            UserDefaults.standard.removeObject(forKey: UserDefaultsKeys.legacyAuthToken)
+            UserDefaults.standard.clearLegacyAuthToken()
             throw TokenError.httpStatus(code: 401, body: "Unauthorized - Token might be expired")
         }
 
@@ -152,7 +152,7 @@ final class RTCTokenService: RTCTokenProtocol {
                   let token = json["accessToken"] as? String else {
                 throw TokenError.missingToken
             }
-            UserDefaults.standard.set(token, forKey: UserDefaultsKeys.legacyAuthToken)
+            UserDefaults.standard.legacyAuthToken = token
             Log.auth.i("API token stored")
             return token
         } catch {
@@ -201,11 +201,11 @@ final class RTCTokenService: RTCTokenProtocol {
     }
 
     private func stableIdentity() -> String {
-        if let stored = UserDefaults.standard.string(forKey: UserDefaultsKeys.userIdentity) {
+        if let stored = UserDefaults.standard.userIdentity {
             return stored
         }
         let newIdentity = "ios-\(UUID().uuidString)"
-        UserDefaults.standard.set(newIdentity, forKey: UserDefaultsKeys.userIdentity)
+        UserDefaults.standard.userIdentity = newIdentity
         return newIdentity
     }
 }
