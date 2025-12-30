@@ -218,6 +218,7 @@ enum UserDefaultsKeys {
     static let userIdentity = "user_identity"
     static let cachedApnsToken = "cached_apns_token"
     static let cachedVoipToken = "cached_voip_token"
+    static let legacyAuthToken = "authToken"
 }
 
 // MARK: - Keychain 키
