@@ -61,7 +61,7 @@ final class AppState: ObservableObject {
             let userInfo = try await authService.getMe()
             currentUser = userInfo
             isAuthenticated = true
-            debugLog("Token valid, user authenticated: \(userInfo.nickname)")
+            debugLog("Token valid, user authenticated: \(userInfo.nickname ?? "")")
         } catch let error as AuthError {
             await handleAuthError(error)
         } catch {
@@ -77,7 +77,7 @@ final class AppState: ObservableObject {
     func didLogin(user: UserMeResponse) {
         currentUser = user
         isAuthenticated = true
-        debugLog("User logged in: \(user.nickname)")
+        debugLog("User logged in: \(user.nickname ?? "")")
     }
 
     /// 로그아웃

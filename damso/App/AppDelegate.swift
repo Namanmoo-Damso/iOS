@@ -86,9 +86,14 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         open url: URL,
         options: [UIApplication.OpenURLOptionsKey: Any] = [:]
     ) -> Bool {
+        debugLog("🔵 openURL 호출됨: \(url.scheme ?? "no scheme")")
         if AuthApi.isKakaoTalkLoginUrl(url) {
-            return AuthController.handleOpenUrl(url: url)
+            debugLog("🔵 카카오 로그인 URL 감지 - handleOpenUrl 호출")
+            let result = AuthController.handleOpenUrl(url: url)
+            debugLog("🔵 handleOpenUrl 결과: \(result)")
+            return result
         }
+        debugLog("🔵 카카오 로그인 URL 아님")
         return false
     }
 
