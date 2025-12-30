@@ -32,12 +32,12 @@ struct UserTypeSelectionView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 16))
                     .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
 
-                Text("담소에 오신 것을 환영합니다!")
+                Text(Strings.Auth.welcomeTitle)
                     .font(.title2)
                     .fontWeight(.bold)
                     .multilineTextAlignment(.center)
 
-                Text("서비스를 이용하실 분을 선택해 주세요")
+                Text(Strings.Auth.selectUserTypeMessage)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }
@@ -47,9 +47,9 @@ struct UserTypeSelectionView: View {
             HStack(spacing: 16) {
                 UserTypeButton(
                     type: .guardian,
-                    title: "보호자",
+                    title: Strings.UserType.guardian,
                     icon: "person.badge.shield.checkmark",
-                    subtitle: "어르신을 돌보는 분",
+                    subtitle: Strings.UserType.guardianDescription,
                     isSelected: selectedType == .guardian
                 ) {
                     withAnimation(.spring(response: 0.3)) {
@@ -62,9 +62,9 @@ struct UserTypeSelectionView: View {
 
                 UserTypeButton(
                     type: .ward,
-                    title: "어르신",
+                    title: Strings.UserType.ward,
                     icon: "person.fill",
-                    subtitle: "케어를 받는 분",
+                    subtitle: Strings.UserType.wardDescription,
                     isSelected: selectedType == .ward
                 ) {
                     withAnimation(.spring(response: 0.3)) {
@@ -98,7 +98,7 @@ struct UserTypeSelectionView: View {
                     } else {
                         Image(systemName: "message.fill")
                             .font(.title3)
-                        Text("카카오로 시작하기")
+                        Text(Strings.Auth.loginWithKakao)
                             .font(.headline)
                     }
                 }
@@ -135,7 +135,7 @@ struct UserTypeSelectionView: View {
                 let result = try await kakaoAuth.login()
                 onLoginSuccess(type, result)
             } catch {
-                errorMessage = "로그인에 실패했습니다. 다시 시도해주세요."
+                errorMessage = Strings.Auth.loginFailed
             }
             isLoggingIn = false
         }
