@@ -210,16 +210,9 @@ enum Numbers {
 
 // MARK: - UserDefaults 키
 
-/// UserDefaults 저장 키
-enum UserDefaultsKeys {
-    static let selectedServerDomain = "selectedServerDomain"
-    static let pendingLoginUserType = "pendingLoginUserType"
-    static let kakaoUserId = "kakao_user_id"
-    static let userIdentity = "user_identity"
-    static let cachedApnsToken = "cached_apns_token"
-    static let cachedVoipToken = "cached_voip_token"
-    static let legacyAuthToken = "authToken"
-}
+/// UserDefaults 키 (호환성 유지용 typealias)
+/// 실제 키는 UserDefaults+Keys.swift의 UserDefaults.Keys에 정의됨
+typealias UserDefaultsKeys = UserDefaults.Keys
 
 // MARK: - Keychain 키
 
