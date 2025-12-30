@@ -7,6 +7,18 @@
 
 import Foundation
 
+// MARK: - 에러 메시지 (nonisolated - LocalizedError에서 사용)
+
+/// 에러 메시지 상수 (nonisolated context에서 접근 가능)
+/// computed property로 safe하게 nonisolated 접근 제공
+enum ErrorMessages {
+    nonisolated static var missingAuthToken: String { "인증 토큰이 없습니다." }
+    nonisolated static var invalidResponse: String { "잘못된 응답입니다." }
+    nonisolated static var missingToken: String { "응답에 토큰이 없습니다." }
+    nonisolated static var unauthorized: String { "인증이 만료되었습니다. 다시 로그인해주세요." }
+    nonisolated static var unknownError: String { "알 수 없는 오류가 발생했습니다." }
+}
+
 // MARK: - 문자열 상수
 
 /// 앱 전체에서 사용되는 문자열 상수
