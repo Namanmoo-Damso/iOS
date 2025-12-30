@@ -7,18 +7,9 @@
 
 import Foundation
 
-/// RTC 토큰 서비스 프로토콜
-protocol RTCTokenServiceProtocol {
-    /// LiveKit 접속용 토큰 발급
-    func fetchLiveKitToken(roomName: String) async throws -> String
-
-    /// 익명 API 토큰 발급 (Legacy)
-    func fetchApiToken() async throws -> String
-}
-
 /// RTC 토큰 관리 서비스
 @MainActor
-final class RTCTokenService: RTCTokenServiceProtocol {
+final class RTCTokenService: RTCTokenProtocol {
 
     // MARK: - Singleton
 
