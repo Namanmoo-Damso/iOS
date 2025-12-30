@@ -9,11 +9,15 @@ import SwiftUI
 
 /// 사용자 타입(보호자/어르신) 선택 화면
 struct UserTypeSelectionView: View {
+    @ObservedObject private var kakaoAuth = KakaoAuthService.shared
+
     @State private var selectedType: UserType?
     @State private var isAnimating = false
+    @State private var isLoggingIn = false
+    @State private var errorMessage: String?
 
-    /// 사용자 타입 선택 완료 콜백
-    let onTypeSelected: (UserType) -> Void
+    /// 카카오 로그인 성공 콜백 (userType, loginResult)
+    let onLoginSuccess: (UserType, KakaoLoginResult) -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -75,22 +79,40 @@ struct UserTypeSelectionView: View {
 
             Spacer()
 
-            // 계속하기 버튼
-            Button(action: continueAction) {
-                HStack {
-                    Text("계속하기")
-                        .font(.headline)
-                    Image(systemName: "arrow.right")
+            // 에러 메시지
+            if let error = errorMessage {
+                Text(error)
+                    .font(.caption)
+                    .foregroundColor(.red)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 8)
+            }
+
+            // 카카오 로그인 버튼
+            Button(action: performKakaoLogin) {
+                HStack(spacing: 12) {
+                    if isLoggingIn {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .black))
+                    } else {
+                        Image(systemName: "message.fill")
+                            .font(.title3)
+                        Text("카카오로 시작하기")
+                            .font(.headline)
+                    }
                 }
-                .foregroundColor(.white)
+                .foregroundColor(selectedType != nil ? .black : .gray)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
-                        .fill(selectedType != nil ? Color.blue : Color.gray)
+                        .fill(selectedType != nil
+                            ? Color(red: 254/255, green: 229/255, blue: 0/255)
+                            : Color(.systemGray5))
                 )
             }
-            .disabled(selectedType == nil)
+            .disabled(selectedType == nil || isLoggingIn)
             .padding(.horizontal, 24)
             .padding(.bottom, 32)
             .opacity(isAnimating ? 1 : 0)
@@ -102,14 +124,26 @@ struct UserTypeSelectionView: View {
         }
     }
 
-    private func continueAction() {
+    private func performKakaoLogin() {
         guard let type = selectedType else { return }
-        onTypeSelected(type)
+
+        isLoggingIn = true
+        errorMessage = nil
+
+        Task {
+            do {
+                let result = try await kakaoAuth.login()
+                onLoginSuccess(type, result)
+            } catch {
+                errorMessage = "로그인에 실패했습니다. 다시 시도해주세요."
+            }
+            isLoggingIn = false
+        }
     }
 }
 
 #Preview {
-    UserTypeSelectionView { type in
-        print("Selected: \(type.displayName)")
+    UserTypeSelectionView { type, result in
+        print("Selected: \(type.displayName), User: \(result.userInfo.nickname ?? "unknown")")
     }
 }

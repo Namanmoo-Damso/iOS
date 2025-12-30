@@ -18,7 +18,22 @@ final class TokenManager {
     private let accessTokenKey = "accessToken"
     private let refreshTokenKey = "refreshToken"
 
-    private init() {}
+    private init() {
+        clearTokensOnFreshInstall()
+    }
+
+    /// 앱 재설치 시 Keychain 토큰 클리어
+    /// Keychain은 앱 삭제 후에도 남아있으므로, 첫 실행 시 클리어
+    private func clearTokensOnFreshInstall() {
+        let hasLaunchedKey = "hasLaunchedBefore"
+        let hasLaunched = UserDefaults.standard.bool(forKey: hasLaunchedKey)
+
+        if !hasLaunched {
+            debugLog("Fresh install detected - clearing keychain tokens")
+            clearTokens()
+            UserDefaults.standard.set(true, forKey: hasLaunchedKey)
+        }
+    }
 
     // MARK: - Access Token
 

@@ -9,8 +9,14 @@ import SwiftUI
 
 /// 보호자 회원가입 폼
 struct GuardianRegistrationView: View {
+    /// 앱 상태
+    @EnvironmentObject var appState: AppState
+
     /// 카카오에서 가져온 사용자 정보
     let kakaoUserInfo: KakaoUserInfo
+
+    /// 신규 사용자 등록용 임시 토큰 (카카오 로그인 응답에서 받음)
+    let tempToken: String?
 
     /// 등록 완료 콜백 (wardEmail 전달)
     let onRegistrationComplete: (String) -> Void
@@ -23,6 +29,9 @@ struct GuardianRegistrationView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var showSuccessAlert = false
+    @State private var isSharing = false
+    @State private var registeredGuardianId: String?
+    @State private var pendingUser: UserMeResponse?
 
     @FocusState private var focusedField: Field?
 
@@ -33,10 +42,12 @@ struct GuardianRegistrationView: View {
 
     init(
         kakaoUserInfo: KakaoUserInfo,
+        tempToken: String? = nil,
         onRegistrationComplete: @escaping (String) -> Void,
         onBack: (() -> Void)? = nil
     ) {
         self.kakaoUserInfo = kakaoUserInfo
+        self.tempToken = tempToken
         self.onRegistrationComplete = onRegistrationComplete
         self.onBack = onBack
     }
@@ -80,12 +91,16 @@ struct GuardianRegistrationView: View {
                 }
             }
         }
+        .navigationViewStyle(.stack)
         .alert("등록 완료", isPresented: $showSuccessAlert) {
-            Button("확인") {
-                onRegistrationComplete(wardEmail)
+            Button("어르신 초대하기") {
+                shareInviteLink()
+            }
+            Button("나중에", role: .cancel) {
+                completeRegistration()
             }
         } message: {
-            Text("보호자 등록이 완료되었습니다.\n어르신을 초대해 주세요.")
+            Text("보호자 등록이 완료되었습니다.\n카카오톡으로 어르신을 초대해 보세요!")
         }
     }
 
@@ -293,6 +308,40 @@ struct GuardianRegistrationView: View {
         }
     }
 
+    // MARK: - Registration Complete
+
+    private func completeRegistration() {
+        // 로그인 상태 업데이트
+        if let user = pendingUser {
+            appState.didLogin(user: user)
+        }
+        onRegistrationComplete(wardEmail)
+    }
+
+    // MARK: - Kakao Share
+
+    private func shareInviteLink() {
+        guard let guardianId = registeredGuardianId else {
+            completeRegistration()
+            return
+        }
+
+        Task {
+            do {
+                try await KakaoLinkService.shared.shareInviteLink(
+                    guardianId: guardianId,
+                    guardianName: kakaoUserInfo.nickname ?? "보호자",
+                    wardEmail: wardEmail
+                )
+            } catch {
+                // 공유 실패해도 진행
+                print("[GuardianRegistrationView] 카카오 공유 실패: \(error.localizedDescription)")
+            }
+            // 공유 후 대시보드로 이동
+            completeRegistration()
+        }
+    }
+
     // MARK: - Registration
 
     private func register() {
@@ -302,11 +351,45 @@ struct GuardianRegistrationView: View {
 
         Task {
             do {
-                let authService = AuthService()
-                _ = try await authService.registerGuardian(
+                let response = try await AuthService.shared.registerGuardian(
                     wardEmail: wardEmail,
-                    wardPhoneNumber: wardPhoneNumber.replacingOccurrences(of: "-", with: "")
+                    wardPhoneNumber: wardPhoneNumber.replacingOccurrences(of: "-", with: ""),
+                    tempToken: tempToken
                 )
+
+                // 응답에 user가 있으면 저장 (아직 didLogin 호출 안함 - Alert 먼저 표시)
+                let user: UserMeResponse
+                if let responseUser = response.user {
+                    guard responseUser.nickname != nil else {
+                        errorMessage = "사용자 닉네임 정보가 없습니다. 카카오 계정 설정을 확인해주세요."
+                        isLoading = false
+                        return
+                    }
+                    guard responseUser.email != nil else {
+                        errorMessage = "사용자 이메일 정보가 없습니다. 카카오 계정 설정을 확인해주세요."
+                        isLoading = false
+                        return
+                    }
+                    user = responseUser
+                } else {
+                    // user가 없으면 서버에서 조회
+                    let userInfo = try await AuthService.shared.getMe()
+                    guard userInfo.nickname != nil else {
+                        errorMessage = "사용자 닉네임 정보가 없습니다. 카카오 계정 설정을 확인해주세요."
+                        isLoading = false
+                        return
+                    }
+                    guard userInfo.email != nil else {
+                        errorMessage = "사용자 이메일 정보가 없습니다. 카카오 계정 설정을 확인해주세요."
+                        isLoading = false
+                        return
+                    }
+                    user = userInfo
+                }
+
+                // Alert 표시를 위해 임시 저장 (didLogin은 Alert 버튼 클릭 시 호출)
+                pendingUser = user
+                registeredGuardianId = response.resolvedGuardianId
                 showSuccessAlert = true
             } catch {
                 errorMessage = error.localizedDescription
@@ -326,4 +409,5 @@ struct GuardianRegistrationView: View {
         ),
         onRegistrationComplete: { wardEmail in print("Complete with \(wardEmail)") }
     )
+    .environmentObject(AppState())
 }
