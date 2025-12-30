@@ -18,9 +18,10 @@ protocol AuthServiceProtocol {
     /// 카카오 로그인 + 서버 JWT 발급
     /// - Parameters:
     ///   - kakaoAccessToken: 카카오 access token
-    ///   - userType: 사용자 타입 (guardian/ward)
+    ///   - kakaoUserInfo: 카카오 사용자 정보 (nickname, email 등)
+    ///   - userType: 사용자 타입 (nil이면 서버에서 null로 저장)
     /// - Returns: 인증 응답 (access token, refresh token, user info)
-    func loginWithKakao(kakaoAccessToken: String, userType: UserType) async throws -> AuthResponse
+    func loginWithKakao(kakaoAccessToken: String, kakaoUserInfo: KakaoUserInfo?, userType: UserType?) async throws -> AuthResponse
 
     /// 토큰 갱신
     /// - Returns: 갱신된 토큰 정보
@@ -40,6 +41,7 @@ protocol AuthServiceProtocol {
     /// - Parameters:
     ///   - wardEmail: 피보호자 이메일
     ///   - wardPhoneNumber: 피보호자 전화번호
+    ///   - tempToken: 신규 사용자 등록용 임시 토큰 (선택)
     /// - Returns: 등록 응답
-    func registerGuardian(wardEmail: String, wardPhoneNumber: String) async throws -> GuardianRegistrationResponse
+    func registerGuardian(wardEmail: String, wardPhoneNumber: String, tempToken: String?) async throws -> GuardianRegistrationResponse
 }

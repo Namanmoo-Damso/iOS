@@ -2,25 +2,27 @@ import SwiftUI
 
 struct KakaoLoginView: View {
     @ObservedObject var kakaoAuth = KakaoAuthService.shared
-    @Binding var isLoggedIn: Bool
+    let onLoginSuccess: (KakaoLoginResult) -> Void
+
+    @State private var hasCalledLoginSuccess = false
 
     var body: some View {
         VStack(spacing: 32) {
             Spacer()
 
             // Logo area
-            VStack(spacing: 16) {
-                Image(systemName: "video.circle.fill")
-                    .font(.system(size: 80))
-                    .foregroundStyle(.blue)
+            VStack(spacing: 12) {
+                // damso 이미지 사용 (Assets.xcassets/damso.imageset)
+                Image("damso")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 80, height: 80)
+                    .clipShape(RoundedRectangle(cornerRadius: 18))
 
-                Text("damso")
-                    .font(.largeTitle)
+                Text("소중한 사람과의 대화")
+                    .font(.title2)
                     .fontWeight(.bold)
-
-                Text("영상통화 서비스")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.primary)
             }
 
             Spacer()
@@ -33,11 +35,29 @@ struct KakaoLoginView: View {
                 } else {
                     // Kakao login button
                     Button(action: {
+                        // 중복 호출 방지
+                        guard !hasCalledLoginSuccess else {
+                            print("[KakaoLoginView] 🚫 이미 로그인 처리 중 - 중복 호출 무시")
+                            return
+                        }
+
+                        print("[KakaoLoginView] 🔵 로그인 버튼 클릭")
                         Task {
                             do {
-                                let _ = try await kakaoAuth.login()
-                                // 로그인 성공 - isLoggedIn이 자동으로 true로 변경됨
+                                print("[KakaoLoginView] 🔵 kakaoAuth.login() 호출 시작")
+                                let result = try await kakaoAuth.login()
+                                print("[KakaoLoginView] ✅ 카카오 로그인 성공: \(result.userInfo.nickname ?? "unknown")")
+
+                                // 중복 호출 방지
+                                guard !hasCalledLoginSuccess else {
+                                    print("[KakaoLoginView] 🚫 이미 onLoginSuccess 호출됨 - 스킵")
+                                    return
+                                }
+                                hasCalledLoginSuccess = true
+                                print("[KakaoLoginView] 🔵 onLoginSuccess 콜백 호출")
+                                onLoginSuccess(result)
                             } catch {
+                                print("[KakaoLoginView] ❌ 카카오 로그인 실패: \(error)")
                                 // 에러는 kakaoAuth.errorMessage에 이미 저장됨
                             }
                         }
@@ -70,17 +90,6 @@ struct KakaoLoginView: View {
                 .frame(height: 60)
         }
         .background(Color(.systemGroupedBackground))
-        .onChange(of: kakaoAuth.isLoggedIn) { _, loggedIn in
-            if loggedIn {
-                isLoggedIn = true
-            }
-        }
-        .onAppear {
-            // Already logged in
-            if kakaoAuth.isLoggedIn {
-                isLoggedIn = true
-            }
-        }
     }
 }
 
@@ -135,5 +144,5 @@ struct UserProfileHeader: View {
 }
 
 #Preview {
-    KakaoLoginView(isLoggedIn: .constant(false))
+    KakaoLoginView { _ in }
 }
