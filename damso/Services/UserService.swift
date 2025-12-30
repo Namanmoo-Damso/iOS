@@ -105,7 +105,7 @@ final class UserService: UserInfoProtocol {
 
         // 로컬 토큰 정리
         TokenManager.shared.clearTokens()
-        UserDefaults.standard.removeObject(forKey: UserDefaultsKeys.legacyAuthToken)
+        UserDefaults.standard.clearLegacyAuthToken()
 
         Log.auth.i("User deleted successfully")
     }

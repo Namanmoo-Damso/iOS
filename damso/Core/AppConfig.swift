@@ -5,10 +5,10 @@ struct AppConfig {
     /// 현재 설정된 서버 도메인 (기본값은 2.sodam.store)
     static var serverDomain: String {
         get {
-            UserDefaults.standard.string(forKey: "selectedServerDomain") ?? "2.sodam.store"
+            UserDefaults.standard.selectedServerDomain ?? "2.sodam.store"
         }
         set {
-            UserDefaults.standard.set(newValue, forKey: "selectedServerDomain")
+            UserDefaults.standard.selectedServerDomain = newValue
         }
     }
     
