@@ -28,6 +28,7 @@
 /* Begin PBXFileReference section */
 		4F0B95642EFD97C800B8DCDE /* damso.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = damso.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4F0B95782EFD97C900B8DCDE /* damsoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = damsoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4F256D6B2F02F7830079E1A9 /* damsoTestHost.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = damsoTestHost.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -64,6 +65,11 @@
 			path = damsoTests;
 			sourceTree = "<group>";
 		};
+		4F256D6C2F02F7830079E1A9 /* damsoTestHost */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = damsoTestHost;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -87,6 +93,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		4F256D682F02F7830079E1A9 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -95,6 +108,7 @@
 			children = (
 				4F0B95662EFD97C800B8DCDE /* damso */,
 				4F0B95792EFD97C900B8DCDE /* damsoTests */,
+				4F256D6C2F02F7830079E1A9 /* damsoTestHost */,
 				4F0B95652EFD97C800B8DCDE /* Products */,
 			);
 			sourceTree = "<group>";
@@ -104,6 +118,7 @@
 			children = (
 				4F0B95642EFD97C800B8DCDE /* damso.app */,
 				4F0B95782EFD97C900B8DCDE /* damsoTests.xctest */,
+				4F256D6B2F02F7830079E1A9 /* damsoTestHost.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -162,6 +177,28 @@
 			productReference = 4F0B95782EFD97C900B8DCDE /* damsoTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		4F256D6A2F02F7830079E1A9 /* damsoTestHost */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4F256D752F02F7850079E1A9 /* Build configuration list for PBXNativeTarget "damsoTestHost" */;
+			buildPhases = (
+				4F256D672F02F7830079E1A9 /* Sources */,
+				4F256D682F02F7830079E1A9 /* Frameworks */,
+				4F256D692F02F7830079E1A9 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				4F256D6C2F02F7830079E1A9 /* damsoTestHost */,
+			);
+			name = damsoTestHost;
+			packageProductDependencies = (
+			);
+			productName = damsoTestHost;
+			productReference = 4F256D6B2F02F7830079E1A9 /* damsoTestHost.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -187,6 +224,9 @@
 						CreatedOnToolsVersion = 26.2;
 						TestTargetID = 4F0B95632EFD97C800B8DCDE;
 					};
+					4F256D6A2F02F7830079E1A9 = {
+						CreatedOnToolsVersion = 26.2;
+					};
 				};
 			};
 			buildConfigurationList = 4F0B955F2EFD97C800B8DCDE /* Build configuration list for PBXProject "damso" */;
@@ -209,6 +249,7 @@
 			targets = (
 				4F0B95632EFD97C800B8DCDE /* damso */,
 				4F0B95772EFD97C900B8DCDE /* damsoTests */,
+				4F256D6A2F02F7830079E1A9 /* damsoTestHost */,
 			);
 		};
 /* End PBXProject section */
@@ -228,6 +269,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		4F256D692F02F7830079E1A9 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -239,6 +287,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		4F0B95742EFD97C900B8DCDE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4F256D672F02F7830079E1A9 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -519,6 +574,72 @@
 			};
 			name = Release;
 		};
+		4F256D732F02F7850079E1A9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 4Y5BW58548;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ilim.damsoTestHost;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		4F256D742F02F7850079E1A9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 4Y5BW58548;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ilim.damsoTestHost;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -545,6 +666,15 @@
 			buildConfigurations = (
 				4F0B957C2EFD97C900B8DCDE /* Debug */,
 				4F0B957D2EFD97C900B8DCDE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		4F256D752F02F7850079E1A9 /* Build configuration list for PBXNativeTarget "damsoTestHost" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4F256D732F02F7850079E1A9 /* Debug */,
+				4F256D742F02F7850079E1A9 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
