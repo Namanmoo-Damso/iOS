@@ -42,10 +42,11 @@ struct ContentView: View {
     @State private var registeredWardEmail: String?
     @State private var showMatchFailureAlert = false
     @State private var matchFailureMessage: String?
-    @State private var tempToken: String?
+    @State private var showUserTypeMismatchAlert = false
+    @State private var userTypeMismatchMessage: String?
 
     // 앱 재시작 시 카카오 로그인 복원을 위한 키
-    private let pendingLoginUserTypeKey = "pendingLoginUserType"
+    private let pendingLoginUserTypeKey = UserDefaultsKeys.pendingLoginUserType
 
     var body: some View {
         Group {
@@ -80,7 +81,6 @@ struct ContentView: View {
                 if let userInfo = kakaoUserInfo {
                     GuardianRegistrationView(
                         kakaoUserInfo: userInfo,
-                        tempToken: tempToken,
                         onRegistrationComplete: { wardEmail in
                             handleGuardianRegistrationComplete(wardEmail: wardEmail)
                         },
@@ -113,12 +113,12 @@ struct ContentView: View {
         .task {
             await checkInitialState()
         }
-        .alert("세션 만료", isPresented: $appState.showSessionExpiredAlert) {
-            Button("확인") {
+        .alert(Strings.Auth.sessionExpiredTitle, isPresented: $appState.showSessionExpiredAlert) {
+            Button(Strings.Common.confirm) {
                 navigationState = .userTypeSelection
             }
         } message: {
-            Text("로그인 세션이 만료되었습니다.\n다시 로그인해 주세요.")
+            Text(Strings.Auth.sessionExpiredMessage)
         }
         .onChange(of: appState.isAuthenticated) { _, isAuthenticated in
             if !isAuthenticated && navigationState == .main {
@@ -137,12 +137,19 @@ struct ContentView: View {
                 deeplinkManager.clearDeeplink()
             }
         }
-        .alert("보호자 정보 없음", isPresented: $showMatchFailureAlert) {
-            Button("확인") {
+        .alert(Strings.Matching.noGuardianTitle, isPresented: $showMatchFailureAlert) {
+            Button(Strings.Common.confirm) {
                 navigationState = .userTypeSelection
             }
         } message: {
-            Text(matchFailureMessage ?? "등록된 보호자 정보가 없습니다.\n보호자에게 먼저 앱에서 회원가입을 요청해주세요.")
+            Text(matchFailureMessage ?? Strings.Matching.noGuardianMessage)
+        }
+        .alert(Strings.Matching.userTypeMismatchTitle, isPresented: $showUserTypeMismatchAlert) {
+            Button(Strings.Common.confirm) {
+                navigationState = .userTypeSelection
+            }
+        } message: {
+            Text(userTypeMismatchMessage ?? Strings.Matching.userTypeMismatchMessage)
         }
     }
 
@@ -162,12 +169,6 @@ struct ContentView: View {
 
     private func checkInitialState() async {
         Log.ui.i("checkInitialState() 시작")
-
-        // 저장된 tempToken 복원 (앱 재시작 시)
-        if let savedTempToken = UserDefaults.standard.string(forKey: "tempToken") {
-            self.tempToken = savedTempToken
-            Log.ui.i("저장된 tempToken 복원됨")
-        }
 
         // 대기 중인 로그인 상태 클리어
         UserDefaults.standard.removeObject(forKey: pendingLoginUserTypeKey)
@@ -207,21 +208,31 @@ struct ContentView: View {
                 }
 
                 // 기존 사용자 처리
+                guard let user = authResponse.user else {
+                    Log.auth.e("응답에 user 정보 없음 - 로그인 실패")
+                    matchFailureMessage = "사용자 정보를 가져올 수 없습니다.\n다시 로그인해주세요."
+                    showMatchFailureAlert = true
+                    return
+                }
+
+                // 선택한 userType과 서버의 userType 일치 확인
+                if let serverUserType = user.userType, serverUserType != userType {
+                    Log.auth.w("userType 불일치 - 선택: \(userType), 서버: \(serverUserType)")
+                    let selectedTypeName = userType == .guardian ? Strings.UserType.guardian : Strings.UserType.ward
+                    let serverTypeName = serverUserType == .guardian ? Strings.UserType.guardian : Strings.UserType.ward
+                    userTypeMismatchMessage = "\(selectedTypeName)(으)로 로그인하려 했지만,\n이미 \(serverTypeName)(으)로 등록된 계정입니다.\n\n\(serverTypeName) 버튼을 눌러 다시 로그인해주세요."
+                    showUserTypeMismatchAlert = true
+                    return
+                }
+
                 if userType == .ward {
                     Log.auth.i("어르신 로그인 - 매칭 상태 확인")
                     handleWardLoginResponse(authResponse)
                 } else {
                     // 보호자 로그인 처리 - 기존 사용자는 바로 메인으로
                     Log.auth.i("보호자 로그인 (기존 사용자) - 메인으로 이동")
-                    if let user = authResponse.user {
-                        appState.didLogin(user: user)
-                        navigationState = .main
-                    } else {
-                        // user 정보가 없으면 에러 - 진행 불가
-                        Log.auth.e("응답에 user 정보 없음 - 로그인 실패")
-                        matchFailureMessage = "사용자 정보를 가져올 수 없습니다.\n다시 로그인해주세요."
-                        showMatchFailureAlert = true
-                    }
+                    appState.didLogin(user: user)
+                    navigationState = .main
                 }
             } catch {
                 Log.auth.e("Login failed: \(error)")
@@ -232,13 +243,6 @@ struct ContentView: View {
 
     private func handleNewUserResponse(authResponse: AuthResponse, userType: UserType) {
         Log.auth.i("신규 사용자 처리 - userType: \(userType)")
-
-        // tempToken 저장 (신규 사용자 등록 시 필요)
-        if let token = authResponse.tempToken {
-            self.tempToken = token
-            UserDefaults.standard.set(token, forKey: "tempToken")
-            Log.auth.i("tempToken 저장됨")
-        }
 
         // 카카오 프로필 정보로 kakaoUserInfo 업데이트
         if let kakaoProfile = authResponse.kakaoProfile {
@@ -308,10 +312,6 @@ struct ContentView: View {
     }
 
     private func handleGuardianRegistrationComplete(wardEmail: String) {
-        // tempToken 정리
-        self.tempToken = nil
-        UserDefaults.standard.removeObject(forKey: "tempToken")
-
         // 보호자 등록 완료 후 초대 화면으로
         guard let user = appState.currentUser,
               let userInfo = kakaoUserInfo else {
@@ -321,7 +321,7 @@ struct ContentView: View {
 
         let inviteInfo = InviteInfo(
             guardianId: user.id,
-            guardianName: userInfo.nickname ?? user.nickname ?? "보호자",
+            guardianName: userInfo.nickname ?? user.nickname ?? Strings.UserType.guardian,
             wardEmail: wardEmail
         )
         navigationState = .inviteCompletion(inviteInfo)
