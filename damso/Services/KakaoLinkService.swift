@@ -130,9 +130,13 @@ final class KakaoLinkService: KakaoLinkServiceProtocol {
         // 앱 실행 파라미터
         let appExecutionParams = ["guardian_id": guardianId, "ward_email": wardEmail]
 
+        // 기본 이미지 URL (옵셔널 처리로 force unwrap 제거)
+        let defaultImageUrl = URL(string: "https://damso.app/og-image.png")
+            ?? URL(string: "https://via.placeholder.com/200")!
+
         let content = Content(
             title: "담소 초대",
-            imageUrl: URL(string: "https://damso.app/og-image.png")!,
+            imageUrl: defaultImageUrl,
             description: "\(guardianName)님이 회원님을 담소에 초대했어요!\nAI 친구와 따뜻한 대화를 나눠보세요.",
             link: Link(
                 webUrl: webUrl,

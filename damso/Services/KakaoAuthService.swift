@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import KakaoSDKUser
 import KakaoSDKAuth
+import os
 
 /// 카카오 사용자 정보
 struct KakaoUserInfo {
@@ -42,21 +43,24 @@ final class KakaoAuthService: ObservableObject {
     // MARK: - Login Status Check
 
     func checkLoginStatus() {
+        Log.kakao.i("checkLoginStatus() 호출됨")
         if AuthApi.hasToken() {
+            Log.kakao.i("토큰 있음 - 유효성 검사 시작")
             UserApi.shared.accessTokenInfo { [weak self] _, error in
                 Task { @MainActor in
                     if let error = error {
-                        self?.debugLog("Token invalid: \(error.localizedDescription)")
+                        Log.kakao.e("Token invalid: \(error.localizedDescription)")
                         self?.isLoggedIn = false
                         self?.currentUser = nil
                     } else {
-                        self?.debugLog("Token valid")
+                        Log.kakao.i("Token valid")
                         self?.isLoggedIn = true
                         await self?.fetchUserInfo()
                     }
                 }
             }
         } else {
+            Log.kakao.i("토큰 없음")
             isLoggedIn = false
             currentUser = nil
         }
@@ -67,30 +71,39 @@ final class KakaoAuthService: ObservableObject {
     /// 카카오 로그인 수행 (토큰 반환 버전)
     /// - Returns: 카카오 로그인 결과 (access token, user info)
     func login() async throws -> KakaoLoginResult {
+        Log.kakao.i("login() 시작")
         isLoading = true
         errorMessage = nil
 
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            Log.kakao.d("login() defer - isLoading = false")
+        }
 
         do {
             let tokenInfo: KakaoTokenInfo
             if UserApi.isKakaoTalkLoginAvailable() {
+                Log.kakao.i("카카오톡 로그인 가능 - loginWithKakaoTalk() 호출")
                 tokenInfo = try await loginWithKakaoTalk()
             } else {
+                Log.kakao.i("카카오톡 없음 - loginWithKakaoAccount() 호출")
                 tokenInfo = try await loginWithKakaoAccount()
             }
 
+            Log.kakao.i("토큰 획득 성공")
             isLoggedIn = true
+            Log.kakao.d("fetchUserInfoAndReturn() 호출")
             let userInfo = try await fetchUserInfoAndReturn()
             currentUser = userInfo
 
+            Log.kakao.i("login() 완료 - 사용자: \(userInfo.nickname ?? "unknown")")
             return KakaoLoginResult(
                 accessToken: tokenInfo.accessToken,
                 refreshToken: tokenInfo.refreshToken,
                 userInfo: userInfo
             )
         } catch {
-            debugLog("Login failed: \(error.localizedDescription)")
+            Log.kakao.e("Login failed: \(error.localizedDescription)")
             errorMessage = "로그인에 실패했습니다: \(error.localizedDescription)"
             isLoggedIn = false
             throw error
@@ -98,17 +111,22 @@ final class KakaoAuthService: ObservableObject {
     }
 
     private func loginWithKakaoTalk() async throws -> KakaoTokenInfo {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<KakaoTokenInfo, Error>) in
+        Log.kakao.i("loginWithKakaoTalk() 시작")
+        return try await withCheckedThrowingContinuation { continuation in
             UserApi.shared.loginWithKakaoTalk { oauthToken, error in
+                Log.kakao.d("loginWithKakaoTalk 콜백 받음")
                 if let error = error {
+                    Log.kakao.e("loginWithKakaoTalk 에러: \(error.localizedDescription)")
                     continuation.resume(throwing: error)
                 } else if let oauthToken = oauthToken {
+                    Log.kakao.i("loginWithKakaoTalk 토큰 획득")
                     let tokenInfo = KakaoTokenInfo(
                         accessToken: oauthToken.accessToken,
                         refreshToken: oauthToken.refreshToken
                     )
                     continuation.resume(returning: tokenInfo)
                 } else {
+                    Log.kakao.e("loginWithKakaoTalk 토큰 없음")
                     continuation.resume(throwing: NSError(domain: "KakaoAuth", code: -1, userInfo: [NSLocalizedDescriptionKey: "No token received"]))
                 }
             }
@@ -116,17 +134,22 @@ final class KakaoAuthService: ObservableObject {
     }
 
     private func loginWithKakaoAccount() async throws -> KakaoTokenInfo {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<KakaoTokenInfo, Error>) in
+        Log.kakao.i("loginWithKakaoAccount() 시작")
+        return try await withCheckedThrowingContinuation { continuation in
             UserApi.shared.loginWithKakaoAccount { oauthToken, error in
+                Log.kakao.d("loginWithKakaoAccount 콜백 받음")
                 if let error = error {
+                    Log.kakao.e("loginWithKakaoAccount 에러: \(error.localizedDescription)")
                     continuation.resume(throwing: error)
                 } else if let oauthToken = oauthToken {
+                    Log.kakao.i("loginWithKakaoAccount 토큰 획득")
                     let tokenInfo = KakaoTokenInfo(
                         accessToken: oauthToken.accessToken,
                         refreshToken: oauthToken.refreshToken
                     )
                     continuation.resume(returning: tokenInfo)
                 } else {
+                    Log.kakao.e("loginWithKakaoAccount 토큰 없음")
                     continuation.resume(throwing: NSError(domain: "KakaoAuth", code: -1, userInfo: [NSLocalizedDescriptionKey: "No token received"]))
                 }
             }
@@ -142,7 +165,7 @@ final class KakaoAuthService: ObservableObject {
             UserApi.shared.logout { [weak self] error in
                 Task { @MainActor in
                     if let error = error {
-                        self?.debugLog("Logout error: \(error.localizedDescription)")
+                        Log.kakao.e("Logout error: \(error.localizedDescription)")
                     }
                     self?.isLoggedIn = false
                     self?.currentUser = nil
@@ -164,7 +187,7 @@ final class KakaoAuthService: ObservableObject {
             UserApi.shared.unlink { [weak self] error in
                 Task { @MainActor in
                     if let error = error {
-                        self?.debugLog("Unlink error: \(error.localizedDescription)")
+                        Log.kakao.e("Unlink error: \(error.localizedDescription)")
                         self?.errorMessage = "연결 해제에 실패했습니다"
                     }
                     self?.isLoggedIn = false
@@ -191,7 +214,7 @@ final class KakaoAuthService: ObservableObject {
             UserApi.shared.me { [weak self] user, error in
                 Task { @MainActor in
                     if let error = error {
-                        self?.debugLog("Failed to fetch user info: \(error.localizedDescription)")
+                        Log.kakao.e("Failed to fetch user info: \(error.localizedDescription)")
                         continuation.resume(throwing: error)
                     } else if let user = user {
                         let userInfo = KakaoUserInfo(
@@ -200,7 +223,7 @@ final class KakaoAuthService: ObservableObject {
                             email: user.kakaoAccount?.email,
                             profileImageUrl: user.kakaoAccount?.profile?.profileImageUrl
                         )
-                        self?.debugLog("User info fetched: \(userInfo.nickname ?? "Unknown")")
+                        Log.kakao.i("User info fetched: \(userInfo.nickname ?? "Unknown")")
 
                         if let userId = user.id {
                             UserDefaults.standard.set(userId, forKey: self?.userKey ?? "")
@@ -214,11 +237,4 @@ final class KakaoAuthService: ObservableObject {
         }
     }
 
-    // MARK: - Debug
-
-    private func debugLog(_ message: String) {
-        #if DEBUG
-        print("[KakaoAuthService] \(message)")
-        #endif
-    }
 }

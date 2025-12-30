@@ -7,6 +7,7 @@
 
 import Foundation
 import Combine
+import os
 
 enum AuthError: LocalizedError {
     case missingAuthToken
@@ -16,6 +17,7 @@ enum AuthError: LocalizedError {
     case networkError(String)
     case decodingError(String)
     case unauthorized
+    case unknown
 
     var errorDescription: String? {
         switch self {
@@ -36,6 +38,8 @@ enum AuthError: LocalizedError {
             return "디코딩 오류: \(msg)"
         case .unauthorized:
             return "인증이 만료되었습니다. 다시 로그인해주세요."
+        case .unknown:
+            return "알 수 없는 오류가 발생했습니다."
         }
     }
 }
@@ -73,6 +77,10 @@ enum TokenError: LocalizedError {
 @MainActor
 final class AuthService: AuthServiceProtocol {
 
+    // MARK: - Singleton
+
+    static let shared = AuthService()
+
     // MARK: - Properties
 
     private let legacyAuthTokenKey = "authToken"
@@ -96,7 +104,11 @@ final class AuthService: AuthServiceProtocol {
     // MARK: - Kakao Login + JWT
 
     /// 카카오 로그인 + 서버 JWT 발급
-    func loginWithKakao(kakaoAccessToken: String, userType: UserType) async throws -> AuthResponse {
+    /// - Parameters:
+    ///   - kakaoAccessToken: 카카오 액세스 토큰
+    ///   - kakaoUserInfo: 카카오 사용자 정보 (nickname, email 등)
+    ///   - userType: 사용자 타입 (nil이면 서버에서 null로 저장, 추후 업데이트)
+    func loginWithKakao(kakaoAccessToken: String, kakaoUserInfo: KakaoUserInfo? = nil, userType: UserType? = nil) async throws -> AuthResponse {
         guard let url = URL(string: "\(AppConfig.apiBaseURL)/v1/auth/kakao") else {
             throw AuthError.networkError("Invalid auth URL")
         }
@@ -106,10 +118,27 @@ final class AuthService: AuthServiceProtocol {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
-        let body: [String: Any] = [
-            "kakao_access_token": kakaoAccessToken,
-            "user_type": userType.rawValue
+        var body: [String: Any] = [
+            "kakaoAccessToken": kakaoAccessToken
         ]
+
+        // 카카오 사용자 정보 추가 (서버에서 DB 저장용)
+        if let userInfo = kakaoUserInfo {
+            if let nickname = userInfo.nickname {
+                body["nickname"] = nickname
+            }
+            if let email = userInfo.email {
+                body["email"] = email
+            }
+            if let profileImageUrl = userInfo.profileImageUrl {
+                body["profileImageUrl"] = profileImageUrl.absoluteString
+            }
+        }
+
+        // userType이 있으면 추가 (기존 호환성)
+        if let userType = userType {
+            body["userType"] = userType.rawValue
+        }
 
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -135,19 +164,60 @@ final class AuthService: AuthServiceProtocol {
             throw AuthError.httpStatus(code: httpResponse.statusCode, body: bodyText)
         }
 
+        // 서버 응답 디버그 로그
+        if let rawJSON = String(data: data, encoding: .utf8) {
+            Log.auth.d("서버 응답 (raw): \(rawJSON)")
+        }
+
         do {
+            Log.auth.d("AuthResponse 디코딩 시작...")
             let authResponse = try JSONDecoder.apiDecoder.decode(AuthResponse.self, from: data)
+            Log.auth.d("AuthResponse 디코딩 성공!")
+            Log.auth.d("- isNewUser: \(authResponse.isNewUser ?? false)")
+            Log.auth.d("- hasAccessToken: \(authResponse.accessToken != nil)")
+            Log.auth.d("- hasRefreshToken: \(authResponse.refreshToken != nil)")
+            Log.auth.d("- hasUser: \(authResponse.user != nil)")
+            if let user = authResponse.user {
+                Log.auth.d("- user.id: \(user.id)")
+                Log.auth.d("- user.nickname: \(user.nickname ?? "nil")")
+                Log.auth.d("- user.userType: \(user.userType?.rawValue ?? "nil")")
+            }
 
-            // TokenManager에 토큰 저장
-            TokenManager.shared.saveTokens(
-                access: authResponse.accessToken,
-                refresh: authResponse.refreshToken
-            )
+            // 신규 사용자가 아닌 경우에만 토큰 저장
+            if !authResponse.isNewUserFlag {
+                if let accessToken = authResponse.accessToken,
+                   let refreshToken = authResponse.refreshToken {
+                    TokenManager.shared.saveTokens(
+                        access: accessToken,
+                        refresh: refreshToken
+                    )
+                    Log.auth.i("Login successful, tokens saved")
+                } else {
+                    Log.auth.w("Login successful but missing tokens in response")
+                }
+            } else {
+                Log.auth.i("New user detected, tempToken provided (registration required)")
+            }
 
-            debugLog("Login successful, tokens saved")
             return authResponse
         } catch {
-            debugLog("Decoding error: \(error)")
+            Log.auth.e("AuthResponse 디코딩 실패!")
+            Log.auth.e("Decoding error: \(error)")
+            // 더 상세한 에러 정보
+            if let decodingError = error as? DecodingError {
+                switch decodingError {
+                case .keyNotFound(let key, let context):
+                    Log.auth.e("Missing key: \(key.stringValue), path: \(context.codingPath.map { $0.stringValue })")
+                case .typeMismatch(let type, let context):
+                    Log.auth.e("Type mismatch: \(type), path: \(context.codingPath.map { $0.stringValue })")
+                case .valueNotFound(let type, let context):
+                    Log.auth.e("Value not found: \(type), path: \(context.codingPath.map { $0.stringValue })")
+                case .dataCorrupted(let context):
+                    Log.auth.e("Data corrupted: \(context.debugDescription)")
+                @unknown default:
+                    break
+                }
+            }
             throw AuthError.decodingError(error.localizedDescription)
         }
     }
@@ -210,7 +280,7 @@ final class AuthService: AuthServiceProtocol {
                 refresh: tokenResponse.refreshToken
             )
 
-            debugLog("Token refreshed successfully")
+            Log.auth.i("Token refreshed successfully")
             return tokenResponse
         } catch {
             throw AuthError.decodingError(error.localizedDescription)
@@ -221,7 +291,7 @@ final class AuthService: AuthServiceProtocol {
     func logout() async {
         TokenManager.shared.clearTokens()
         UserDefaults.standard.removeObject(forKey: legacyAuthTokenKey)
-        debugLog("Logged out, all tokens cleared")
+        Log.auth.i("Logged out, all tokens cleared")
     }
 
     /// 회원탈퇴
@@ -265,7 +335,7 @@ final class AuthService: AuthServiceProtocol {
         TokenManager.shared.clearTokens()
         UserDefaults.standard.removeObject(forKey: legacyAuthTokenKey)
 
-        debugLog("User deleted successfully")
+        Log.auth.i("User deleted successfully")
     }
 
     /// 현재 사용자 정보 조회
@@ -307,17 +377,27 @@ final class AuthService: AuthServiceProtocol {
 
         do {
             let userResponse = try JSONDecoder.apiDecoder.decode(UserMeResponse.self, from: data)
-            debugLog("User info fetched: \(userResponse.nickname)")
+            Log.auth.i("User info fetched: \(userResponse.nickname ?? "nil")")
             return userResponse
         } catch {
-            debugLog("Decoding error: \(error)")
+            Log.auth.e("Decoding error: \(error)")
             throw AuthError.decodingError(error.localizedDescription)
         }
     }
 
     /// 보호자 등록
-    func registerGuardian(wardEmail: String, wardPhoneNumber: String) async throws -> GuardianRegistrationResponse {
-        guard let accessToken = TokenManager.shared.accessToken else {
+    /// - Parameters:
+    ///   - wardEmail: 어르신 이메일
+    ///   - wardPhoneNumber: 어르신 전화번호
+    ///   - tempToken: 신규 사용자 등록용 임시 토큰 (카카오 로그인 응답에서 받음)
+    func registerGuardian(wardEmail: String, wardPhoneNumber: String, tempToken: String? = nil) async throws -> GuardianRegistrationResponse {
+        // tempToken이 있으면 사용, 없으면 기존 accessToken 사용
+        let authToken: String
+        if let tempToken = tempToken {
+            authToken = tempToken
+        } else if let accessToken = TokenManager.shared.accessToken {
+            authToken = accessToken
+        } else {
             throw AuthError.missingAuthToken
         }
 
@@ -329,11 +409,11 @@ final class AuthService: AuthServiceProtocol {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
 
         let body: [String: Any] = [
-            "ward_email": wardEmail,
-            "ward_phone_number": wardPhoneNumber
+            "wardEmail": wardEmail,
+            "wardPhoneNumber": wardPhoneNumber
         ]
 
         do {
@@ -364,12 +444,38 @@ final class AuthService: AuthServiceProtocol {
             throw AuthError.httpStatus(code: httpResponse.statusCode, body: bodyText)
         }
 
+        // 디버그: 서버 응답 확인
+        if let rawJSON = String(data: data, encoding: .utf8) {
+            Log.auth.d("Guardian registration 서버 응답 (raw): \(rawJSON)")
+        }
+
         do {
             let registrationResponse = try JSONDecoder.apiDecoder.decode(GuardianRegistrationResponse.self, from: data)
-            debugLog("Guardian registered: \(registrationResponse.guardianId)")
+            Log.auth.i("Guardian registered: \(registrationResponse.resolvedGuardianId)")
+
+            // 응답에 토큰이 있으면 저장
+            if let accessToken = registrationResponse.accessToken,
+               let refreshToken = registrationResponse.refreshToken {
+                TokenManager.shared.saveTokens(access: accessToken, refresh: refreshToken)
+                Log.auth.i("Registration tokens saved")
+            }
+
             return registrationResponse
         } catch {
-            debugLog("Decoding error: \(error)")
+            Log.auth.e("Decoding error: \(error)")
+            // 더 상세한 에러 정보
+            if let decodingError = error as? DecodingError {
+                switch decodingError {
+                case .keyNotFound(let key, let context):
+                    Log.auth.e("Missing key: \(key.stringValue), path: \(context.codingPath)")
+                case .typeMismatch(let type, let context):
+                    Log.auth.e("Type mismatch: \(type), path: \(context.codingPath)")
+                case .valueNotFound(let type, let context):
+                    Log.auth.e("Value not found: \(type), path: \(context.codingPath)")
+                default:
+                    break
+                }
+            }
             throw AuthError.decodingError(error.localizedDescription)
         }
     }
@@ -412,7 +518,7 @@ final class AuthService: AuthServiceProtocol {
                 throw TokenError.missingToken
             }
             UserDefaults.standard.set(token, forKey: legacyAuthTokenKey)
-            debugLog("API token stored")
+            Log.auth.i("API token stored")
             return token
         } catch {
             if let tokenErr = error as? TokenError { throw tokenErr }
@@ -491,7 +597,7 @@ final class AuthService: AuthServiceProtocol {
                     // 재시도
                     return try await fetchLiveKitToken(roomName: roomName)
                 } catch {
-                    debugLog("Token refresh failed: \(error)")
+                    Log.auth.e("Token refresh failed: \(error)")
                 }
             }
             UserDefaults.standard.removeObject(forKey: legacyAuthTokenKey)
@@ -554,9 +660,4 @@ final class AuthService: AuthServiceProtocol {
         return newIdentity
     }
 
-    private func debugLog(_ message: String) {
-        #if DEBUG
-        print("[AuthService] \(message)")
-        #endif
-    }
 }
