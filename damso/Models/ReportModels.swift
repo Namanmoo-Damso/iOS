@@ -11,15 +11,20 @@ import Foundation
 
 /// 보호자 분석 보고서 응답
 struct GuardianReportResponse: Codable {
+    let period: String?
     let emotionTrend: [EmotionDataPoint]
     let healthKeywords: HealthKeywords
+    let topTopics: [TopTopic]?
     let weeklySummary: String
+    let recommendations: [String]?
 
-    enum CodingKeys: String, CodingKey {
-        case emotionTrend = "emotion_trend"
-        case healthKeywords = "health_keywords"
-        case weeklySummary = "weekly_summary"
-    }
+    // 서버가 camelCase로 응답하므로 CodingKeys 불필요
+}
+
+/// 인기 주제
+struct TopTopic: Codable {
+    let topic: String
+    let count: Int
 }
 
 /// 감정 데이터 포인트
@@ -65,6 +70,7 @@ struct HealthKeywords: Codable {
 #if DEBUG
 extension GuardianReportResponse {
     static let mock = GuardianReportResponse(
+        period: "week",
         emotionTrend: [
             EmotionDataPoint(date: "2024-12-23", score: 0.8, mood: .positive),
             EmotionDataPoint(date: "2024-12-24", score: 0.85, mood: .positive),
@@ -79,7 +85,13 @@ extension GuardianReportResponse {
             sleep: HealthKeywords.StatusAnalysis(status: "good"),
             meal: HealthKeywords.StatusAnalysis(status: "regular")
         ),
-        weeklySummary: "이번 주 어머니께서는 전반적으로 긍정적인 감정 상태를 보이셨습니다. 손주 이야기를 자주 하시며 즐거워하셨습니다. 다만 허리 통증을 3회 언급하셨으니 확인이 필요합니다."
+        topTopics: [
+            TopTopic(topic: "날씨", count: 5),
+            TopTopic(topic: "손주", count: 4),
+            TopTopic(topic: "건강", count: 3)
+        ],
+        weeklySummary: "이번 주 어머니께서는 전반적으로 긍정적인 감정 상태를 보이셨습니다. 손주 이야기를 자주 하시며 즐거워하셨습니다. 다만 허리 통증을 3회 언급하셨으니 확인이 필요합니다.",
+        recommendations: ["통증 관련 언급이 있었습니다. 건강 상태를 확인해보세요."]
     )
 }
 #endif

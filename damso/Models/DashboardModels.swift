@@ -15,11 +15,7 @@ struct GuardianDashboardResponse: Codable {
     let alerts: [DashboardAlert]
     let recentCalls: [RecentCall]
 
-    enum CodingKeys: String, CodingKey {
-        case statistics
-        case alerts
-        case recentCalls = "recent_calls"
-    }
+    // 서버가 camelCase로 응답하므로 CodingKeys 불필요
 }
 
 /// 대시보드 통계
@@ -29,12 +25,7 @@ struct DashboardStatistics: Codable {
     let averageDuration: Int
     let overallMood: MoodStatistics
 
-    enum CodingKeys: String, CodingKey {
-        case totalCalls = "total_calls"
-        case weeklyChange = "weekly_change"
-        case averageDuration = "average_duration"
-        case overallMood = "overall_mood"
-    }
+    // 서버가 camelCase로 응답하므로 CodingKeys 불필요
 }
 
 /// 기분 통계

@@ -10,6 +10,7 @@ import SwiftUI
 /// 어르신 메인 탭 뷰
 struct WardTabView: View {
     @EnvironmentObject var appState: AppState
+    @StateObject private var callViewModel = DependencyContainer.shared.makeLiveKitViewModel()
     @State private var selectedTab = 0
     @State private var showCallView = false
 
@@ -23,35 +24,24 @@ struct WardTabView: View {
                 }
                 .tag(0)
 
-            // 탭 2: 대화하기 (탭 선택 시 통화 화면 표시)
-            CallTabPlaceholder(showCallView: $showCallView)
-                .tabItem {
-                    Label("대화하기", systemImage: "phone.fill")
-                }
-                .tag(1)
-
-            // 탭 3: 설정
+            // 탭 2: 설정
             WardSettingsView()
                 .environmentObject(appState)
                 .tabItem {
                     Label("설정", systemImage: "gearshape.fill")
                 }
-                .tag(2)
-        }
-        .onChange(of: selectedTab) { _, newValue in
-            if newValue == 1 {
-                // 통화 탭 선택 시 통화 화면 표시
-                showCallView = true
-                // 홈 탭으로 되돌리기 (통화 종료 후 홈으로 복귀)
-                selectedTab = 0
-            }
+                .tag(1)
         }
         .fullScreenCover(isPresented: $showCallView) {
-            LiveKitRoomView(
-                viewModel: DependencyContainer.shared.makeLiveKitViewModel(),
-                dismissOnCallEnd: true
-            )
-            .environmentObject(appState)
+            FullScreenCallView(viewModel: callViewModel) {
+                showCallView = false
+            }
+            .onAppear {
+                // 통화 화면 표시 시 자동으로 통화 시작
+                if !callViewModel.isConnected && !callViewModel.isBusy {
+                    callViewModel.startCall()
+                }
+            }
         }
     }
 }
@@ -61,6 +51,7 @@ struct WardHomeTabContent: View {
     @EnvironmentObject var appState: AppState
     @Binding var showCallView: Bool
     @AppStorage("locationTrackingEnabled") private var locationTrackingEnabled = true
+    @State private var showMyProfile = false
 
     var body: some View {
         NavigationStack {
@@ -81,7 +72,7 @@ struct WardHomeTabContent: View {
                             title: "내 정보",
                             color: .blue
                         ) {
-                            // TODO: 내 정보 화면으로 이동
+                            showMyProfile = true
                         }
 
                         QuickLinkButton(
@@ -116,34 +107,11 @@ struct WardHomeTabContent: View {
                     LocationService.shared.startTracking()
                 }
             }
-        }
-    }
-}
-
-/// 통화 탭 플레이스홀더 (탭 선택 시 fullScreenCover로 전환)
-struct CallTabPlaceholder: View {
-    @Binding var showCallView: Bool
-
-    var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "phone.circle.fill")
-                .font(.system(size: 80))
-                .foregroundColor(.green)
-
-            Text("대화하기")
-                .font(.title2)
-                .fontWeight(.semibold)
-
-            Button {
-                showCallView = true
-            } label: {
-                Text("전화 시작하기")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 32)
-                    .padding(.vertical, 16)
-                    .background(Color.green)
-                    .cornerRadius(25)
+            .sheet(isPresented: $showMyProfile) {
+                NavigationStack {
+                    MyProfileView()
+                        .environmentObject(appState)
+                }
             }
         }
     }

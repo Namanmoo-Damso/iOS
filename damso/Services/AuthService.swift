@@ -126,7 +126,7 @@ final class AuthService: AuthServiceProtocol {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
         let body: [String: Any] = [
-            "refresh_token": refreshToken
+            "refreshToken": refreshToken
         ]
 
         do {

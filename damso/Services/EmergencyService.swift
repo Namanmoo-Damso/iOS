@@ -26,7 +26,7 @@ final class EmergencyService {
             throw EmergencyError.unauthorized
         }
 
-        guard let url = URL(string: "\(AppConfig.apiBaseURL)/v1/emergency") else {
+        guard let url = URL(string: "\(AppConfig.apiBaseURL)/v1/ward/emergency") else {
             throw EmergencyError.invalidURL
         }
 

@@ -12,7 +12,6 @@ struct NotificationSettingsView: View {
     @AppStorage("callReminderEnabled") private var callReminderEnabled = true
     @AppStorage("healthAlertEnabled") private var healthAlertEnabled = true
     @AppStorage("callCompletedAlertEnabled") private var callCompletedAlertEnabled = true
-    @AppStorage("dailySummaryEnabled") private var dailySummaryEnabled = false
 
     @State private var isSyncing = false
     @State private var showPermissionAlert = false
@@ -61,20 +60,6 @@ struct NotificationSettingsView: View {
                 .onChange(of: callCompletedAlertEnabled) { _, _ in
                     syncSettings()
                 }
-
-                Toggle(isOn: $dailySummaryEnabled) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("일일 요약")
-                            .font(.body)
-
-                        Text("매일 저녁 어르신의 하루 요약 전송")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                .onChange(of: dailySummaryEnabled) { _, _ in
-                    syncSettings()
-                }
             } header: {
                 Text("푸시 알림")
             } footer: {
@@ -114,8 +99,7 @@ struct NotificationSettingsView: View {
                 try await PushNotificationService.shared.updateNotificationSettings(
                     callReminder: callReminderEnabled,
                     callComplete: callCompletedAlertEnabled,
-                    healthAlert: healthAlertEnabled,
-                    dailySummary: dailySummaryEnabled
+                    healthAlert: healthAlertEnabled
                 )
             } catch {
                 debugLog("Failed to sync settings: \(error)")

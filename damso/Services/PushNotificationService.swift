@@ -14,16 +14,29 @@ final class PushNotificationService {
 
     private init() {}
 
+    // MARK: - Properties
+
+    private var apnsEnv: String {
+        #if DEBUG
+        return "sandbox"
+        #else
+        return "prod"
+        #endif
+    }
+
     // MARK: - Public Methods
 
-    /// 디바이스 토큰 서버에 등록
-    func registerDeviceToken(_ token: String) async throws {
+    /// 디바이스 토큰 서버에 등록 (APNs 또는 VoIP)
+    /// - Parameters:
+    ///   - apnsToken: 일반 푸시 토큰 (optional)
+    ///   - voipToken: VoIP 푸시 토큰 (optional)
+    func registerDeviceTokens(apnsToken: String? = nil, voipToken: String? = nil) async throws {
         guard let accessToken = TokenManager.shared.accessToken else {
             debugLog("No access token, skipping device token registration")
             return
         }
 
-        guard let url = URL(string: "\(AppConfig.apiBaseURL)/v1/users/me/device-token") else {
+        guard let url = URL(string: "\(AppConfig.apiBaseURL)/v1/devices/register") else {
             throw PushError.invalidURL
         }
 
@@ -32,10 +45,23 @@ final class PushNotificationService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
 
-        let body: [String: Any] = [
-            "token": token,
-            "platform": "ios"
+        let identity = stableIdentity()
+        let supportsCallKit = resolveCallCapability() == .callKit
+
+        var body: [String: Any] = [
+            "identity": identity,
+            "platform": "ios",
+            "env": apnsEnv,
+            "supportsCallKit": supportsCallKit
         ]
+
+        if let apnsToken = apnsToken, !apnsToken.isEmpty {
+            body["apnsToken"] = apnsToken
+        }
+
+        if let voipToken = voipToken, !voipToken.isEmpty {
+            body["voipToken"] = voipToken
+        }
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -46,22 +72,37 @@ final class PushNotificationService {
             throw PushError.serverError
         }
 
-        debugLog("Device token registered successfully")
+        debugLog("Device tokens registered successfully (apns: \(apnsToken != nil), voip: \(voipToken != nil))")
+    }
+
+    /// 단일 APNs 토큰 등록 (하위 호환)
+    func registerDeviceToken(_ token: String) async throws {
+        try await registerDeviceTokens(apnsToken: token)
+    }
+
+    // MARK: - Private Helpers
+
+    private func stableIdentity() -> String {
+        if let stored = UserDefaults.standard.userIdentity {
+            return stored
+        }
+        let newIdentity = "ios-\(UUID().uuidString)"
+        UserDefaults.standard.userIdentity = newIdentity
+        return newIdentity
     }
 
     /// 알림 설정 서버에 동기화
     func updateNotificationSettings(
         callReminder: Bool,
         callComplete: Bool,
-        healthAlert: Bool,
-        dailySummary: Bool
+        healthAlert: Bool
     ) async throws {
         guard let accessToken = TokenManager.shared.accessToken else {
             debugLog("No access token, skipping notification settings update")
             return
         }
 
-        guard let url = URL(string: "\(AppConfig.apiBaseURL)/v1/users/me/notification-settings") else {
+        guard let url = URL(string: "\(AppConfig.apiBaseURL)/v1/guardian/notification-settings") else {
             throw PushError.invalidURL
         }
 
@@ -73,8 +114,7 @@ final class PushNotificationService {
         let body: [String: Any] = [
             "callReminder": callReminder,
             "callComplete": callComplete,
-            "healthAlert": healthAlert,
-            "dailySummary": dailySummary
+            "healthAlert": healthAlert
         ]
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)

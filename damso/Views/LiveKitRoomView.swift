@@ -62,7 +62,20 @@ struct LiveKitRoomView: View {
                     .padding(.top, 12)
                 }
             }
-            .navigationTitle("LiveKit")
+            .navigationTitle("영상통화")
+            .toolbar {
+                if dismissOnCallEnd {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.body.weight(.medium))
+                                .foregroundColor(.primary)
+                        }
+                    }
+                }
+            }
         }
         .fullScreenCover(isPresented: $showFullScreenCall) {
             FullScreenCallView(viewModel: viewModel) {

@@ -378,47 +378,35 @@ struct AuthResponse: Codable {
 struct TokenRefreshResponse: Codable {
     let accessToken: String
     let refreshToken: String
-    let expiresIn: Int
+    let expiresIn: Int?  // 서버에서 반환하지 않을 수 있음
 
-    enum CodingKeys: String, CodingKey {
-        case accessToken = "access_token"
-        case refreshToken = "refresh_token"
-        case expiresIn = "expires_in"
-    }
+    // 서버가 camelCase로 응답하므로 CodingKeys 불필요
 }
 
 // MARK: - 등록/매칭 관련 응답
 
-/// POST /guardians 응답
+/// POST /v1/users/register/guardian 응답
 struct GuardianRegistrationResponse: Codable {
-    // 서버 응답 형식에 맞춰 optional 처리
-    let guardianId: String?
-    let userId: String?
-    let wardEmail: String?
-    let wardPhoneNumber: String?
-    let message: String?
-
-    // 서버가 다른 필드명을 쓸 수 있음 (camelCase vs snake_case)
-    let id: String?
     let accessToken: String?
     let refreshToken: String?
     let user: UserMeResponse?
+    let guardianInfo: GuardianInfoDetail?
 
-    enum CodingKeys: String, CodingKey {
-        case guardianId = "guardian_id"
-        case userId = "user_id"
-        case wardEmail = "ward_email"
-        case wardPhoneNumber = "ward_phone_number"
-        case message
-        case id
-        case accessToken = "access_token"
-        case refreshToken = "refresh_token"
-        case user
-    }
+    // 서버가 camelCase로 응답하므로 CodingKeys 불필요
+}
 
-    /// 응답에서 guardian ID 추출 (여러 필드명 지원)
+/// 보호자 등록 시 반환되는 상세 정보
+struct GuardianInfoDetail: Codable {
+    let id: String
+    let wardEmail: String
+    let wardPhoneNumber: String
+    let linkedWard: WardSummary?
+}
+
+extension GuardianRegistrationResponse {
+    /// 응답에서 guardian ID 추출
     var resolvedGuardianId: String {
-        guardianId ?? id ?? userId ?? "unknown"
+        guardianInfo?.id ?? user?.id ?? "unknown"
     }
 }
 

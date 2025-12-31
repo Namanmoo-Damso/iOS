@@ -85,7 +85,7 @@ final class LocationService: NSObject, ObservableObject {
             return
         }
 
-        guard let url = URL(string: "\(AppConfig.apiBaseURL)/v1/locations") else {
+        guard let url = URL(string: "\(AppConfig.apiBaseURL)/v1/ward/location") else {
             debugLog("Invalid location URL")
             return
         }

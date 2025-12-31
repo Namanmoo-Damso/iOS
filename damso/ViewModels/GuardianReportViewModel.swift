@@ -57,13 +57,47 @@ final class GuardianReportViewModel: ObservableObject {
     // MARK: - Private Methods
 
     private func fetchReportFromServer() async throws -> GuardianReportResponse {
-        // TODO: 실제 API 구현
-        #if DEBUG
-        try await Task.sleep(nanoseconds: 500_000_000)
-        return GuardianReportResponse.mock
-        #else
-        throw AuthError.unknown
-        #endif
+        guard let accessToken = TokenManager.shared.accessToken else {
+            throw AuthError.missingAuthToken
+        }
+
+        guard let url = URL(string: "\(AppConfig.apiBaseURL)/v1/guardian/report?period=week") else {
+            throw AuthError.networkError("Invalid report URL")
+        }
+
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: Numbers.Timeout.networkRequest)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+
+        let data: Data
+        let response: URLResponse
+
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch {
+            throw AuthError.networkError(error.localizedDescription)
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AuthError.invalidResponse
+        }
+
+        if httpResponse.statusCode == 401 {
+            throw AuthError.unauthorized
+        }
+
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            let bodyText = String(data: data, encoding: .utf8) ?? ""
+            throw AuthError.httpStatus(code: httpResponse.statusCode, body: bodyText)
+        }
+
+        do {
+            return try JSONDecoder.apiDecoder.decode(GuardianReportResponse.self, from: data)
+        } catch {
+            Log.auth.e("Report decoding error: \(error)")
+            throw AuthError.decodingError(error.localizedDescription)
+        }
     }
 
     private func updateFromResponse(_ response: GuardianReportResponse) {

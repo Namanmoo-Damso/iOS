@@ -32,8 +32,9 @@ enum AppNavigationState: Equatable {
 
 struct ContentView: View {
     @StateObject private var appState = AppState()
-    @StateObject private var viewModel = DependencyContainer.shared.makeLiveKitViewModel()
+    @StateObject private var callViewModel = DependencyContainer.shared.makeLiveKitViewModel()
     @StateObject private var kakaoAuth = KakaoAuthService.shared
+    @ObservedObject private var callStateStore = CallStateStore.shared
     @EnvironmentObject var deeplinkManager: DeeplinkManager
 
     @State private var navigationState: AppNavigationState = .splash
@@ -44,6 +45,7 @@ struct ContentView: View {
     @State private var matchFailureMessage: String?
     @State private var showUserTypeMismatchAlert = false
     @State private var userTypeMismatchMessage: String?
+    @State private var showGlobalCallView = false
 
     var body: some View {
         Group {
@@ -148,6 +150,41 @@ struct ContentView: View {
         } message: {
             Text(userTypeMismatchMessage ?? Strings.Matching.userTypeMismatchMessage)
         }
+        // 전역 수신 통화 배너 (앱 실행 중 모든 화면에서 표시)
+        .overlay(alignment: .top) {
+            if let call = callStateStore.activeCall, call.status == .ringing, !showGlobalCallView {
+                IncomingCallBanner(
+                    caller: call.handle,
+                    onAccept: { acceptIncomingCall() },
+                    onDecline: { declineIncomingCall() }
+                )
+                .padding(.top, 50)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .animation(.spring(response: 0.3), value: callStateStore.activeCall?.id)
+            }
+        }
+        // 전역 통화 화면 (CallKit 수락 시 자동 표시)
+        .fullScreenCover(isPresented: $showGlobalCallView) {
+            FullScreenCallView(viewModel: callViewModel) {
+                showGlobalCallView = false
+            }
+            .onAppear {
+                // 통화 화면 표시 시 자동으로 통화 시작
+                if !callViewModel.isConnected && !callViewModel.isBusy {
+                    if let call = callStateStore.activeCall, let roomName = call.roomName {
+                        callViewModel.startCall(roomName: roomName)
+                    } else {
+                        callViewModel.startCall()
+                    }
+                }
+            }
+        }
+        // CallKit에서 수락 시 자동으로 통화 화면 표시
+        .onChange(of: callStateStore.activeCall?.status) { _, newStatus in
+            if newStatus == .answered {
+                showGlobalCallView = true
+            }
+        }
     }
 
     // MARK: - Computed Views
@@ -200,7 +237,13 @@ struct ContentView: View {
 
                 // 신규 사용자 처리
                 if authResponse.isNewUserFlag {
-                    handleNewUserResponse(authResponse: authResponse, userType: userType)
+                    if userType == .ward {
+                        // ward는 신규여도 matchStatus 확인 필요 (자동 매칭 가능)
+                        Log.auth.i("어르신 신규 가입 - 매칭 상태 확인")
+                        handleWardLoginResponse(authResponse)
+                    } else {
+                        handleNewUserResponse(authResponse: authResponse, userType: userType)
+                    }
                     return
                 }
 
@@ -320,6 +363,39 @@ struct ContentView: View {
                 Log.ui.i("인증되지 않음 - 사용자 타입 선택으로 이동")
                 navigationState = .userTypeSelection
             }
+        }
+    }
+
+    // MARK: - 수신 통화 처리
+
+    private func acceptIncomingCall() {
+        guard let call = callStateStore.activeCall else { return }
+        Log.ui.i("수신 통화 수락 - handle: \(call.handle)")
+
+        // CallKit 지원 여부에 따라 분기
+        if resolveCallCapability() == .callKit {
+            // CallKit: answerCall → setAnswered → onChange에서 showGlobalCallView = true
+            CallManager.shared.answerCall(uuid: call.id)
+        } else {
+            // WiFi-only iPad: 직접 통화 시작
+            callStateStore.clearCall()
+            showGlobalCallView = true
+            if let roomName = call.roomName {
+                callViewModel.startCall(roomName: roomName)
+            } else {
+                callViewModel.startCall()
+            }
+        }
+    }
+
+    private func declineIncomingCall() {
+        guard let call = callStateStore.activeCall else { return }
+        Log.ui.i("수신 통화 거절 - handle: \(call.handle)")
+
+        if resolveCallCapability() == .callKit {
+            CallManager.shared.endCall(uuid: call.id)
+        } else {
+            callStateStore.clearCall()
         }
     }
 
