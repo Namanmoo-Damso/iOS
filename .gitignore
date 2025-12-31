@@ -108,5 +108,12 @@ xcuserdata
 **/xcshareddata/WorkspaceSettings.xcsettings
 
 # End of https://www.toptal.com/developers/gitignore/api/xcode,swift,swiftpm,swiftpackagemanager
-\n.derivedData/
-\nPackages/
+
+# Local only - not tracked in git
+.claude/
+damsoTestHost/
+damsoTests/
+scripts/
+CLAUDE.md
+deployment_fix_instructions.txt
+user_question.txt
