@@ -170,9 +170,41 @@ final class AuthService: AuthServiceProtocol {
 
     /// 로그아웃
     func logout() async {
+        // 서버에 로그아웃 요청 (room_members, devices, refresh_tokens 정리)
+        if let accessToken = TokenManager.shared.accessToken {
+            await callServerLogout(accessToken: accessToken)
+        }
+
         TokenManager.shared.clearTokens()
         UserDefaults.standard.clearLegacyAuthToken()
         Log.auth.i("Logged out, all tokens cleared")
+    }
+
+    /// 서버 로그아웃 API 호출
+    private func callServerLogout(accessToken: String) async {
+        guard let url = URL(string: "\(AppConfig.apiBaseURL)/v1/auth/logout") else {
+            Log.auth.w("Invalid logout URL")
+            return
+        }
+
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: Numbers.Timeout.networkRequest)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            if let httpResponse = response as? HTTPURLResponse {
+                if (200..<300).contains(httpResponse.statusCode) {
+                    Log.auth.i("Server logout successful")
+                } else {
+                    Log.auth.w("Server logout failed: \(httpResponse.statusCode)")
+                }
+            }
+        } catch {
+            // 서버 로그아웃 실패해도 로컬 토큰은 삭제 진행
+            Log.auth.w("Server logout request failed: \(error.localizedDescription)")
+        }
     }
 
     // MARK: - AuthServiceProtocol Conformance (Delegation)

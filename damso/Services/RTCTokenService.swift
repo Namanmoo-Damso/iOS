@@ -113,7 +113,12 @@ final class RTCTokenService: RTCTokenProtocol {
             throw TokenError.httpStatus(code: httpResponse.statusCode, body: body)
         }
 
-        return try parseToken(from: data)
+        let rawResponse = String(data: data, encoding: .utf8) ?? "(no data)"
+        print("🎫 [Token] Raw response: \(rawResponse.prefix(200))...")
+
+        let token = try parseToken(from: data)
+        print("🎫 [Token] Parsed token length: \(token.count)")
+        return token
     }
 
     /// 익명 API 토큰 발급 (Legacy)

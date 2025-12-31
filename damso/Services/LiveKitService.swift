@@ -111,37 +111,56 @@ final class LiveKitService: NSObject, ObservableObject, LiveKitServiceProtocol {
     }
     
     func connect(token: String) async throws {
-        debugLog("Connecting to \(AppConfig.liveKitServerURL)")
-        
-        if room.connectionState != .disconnected {
-            await room.disconnect()
+        debugLog("🔌 [CONNECT] START - url=\(AppConfig.liveKitServerURL)")
+        debugLog("🔌 [CONNECT] token length=\(token.count), prefix=\(token.prefix(20))...")
+        debugLog("🔌 [CONNECT] current state=\(room.connectionState)")
+
+        // 이미 연결 중이거나 연결된 상태면 무시
+        if room.connectionState == .connecting || room.connectionState == .connected {
+            debugLog("🔌 [CONNECT] SKIPPED - already connecting or connected")
+            return
         }
-        
+
+        if room.connectionState != .disconnected {
+            debugLog("🔌 [CONNECT] Disconnecting first...")
+            await room.disconnect()
+            debugLog("🔌 [CONNECT] Disconnected, now reconnecting")
+        }
+
         let audioOptions = AudioCaptureOptions(
             echoCancellation: true,
             autoGainControl: true,
             noiseSuppression: true,
             typingNoiseDetection: true
         )
-        
+
         let roomOptions = RoomOptions(defaultAudioCaptureOptions: audioOptions)
         let connectOptions = ConnectOptions(autoSubscribe: true, reconnectAttempts: 10)
-        
+
+        debugLog("🔌 [CONNECT] Calling room.connect()...")
         try await room.connect(
             url: AppConfig.liveKitServerURL,
             token: token,
             connectOptions: connectOptions,
             roomOptions: roomOptions
         )
-        
+        debugLog("🔌 [CONNECT] room.connect() completed - state=\(room.connectionState)")
+
+        debugLog("🔌 [CONNECT] Enabling microphone...")
         try await room.localParticipant.setMicrophone(enabled: true)
+        debugLog("🔌 [CONNECT] Microphone enabled")
+
+        debugLog("🔌 [CONNECT] Enabling camera...")
         let captureOptions = CameraCaptureOptions(dimensions: .h1080_169)
         try await room.localParticipant.setCamera(enabled: true, captureOptions: captureOptions)
-        
+        debugLog("🔌 [CONNECT] Camera enabled")
+
+        debugLog("🔌 [CONNECT] END - SUCCESS")
         self.objectWillChange.send()
     }
     
     func disconnect() async {
+        debugLog("🔌 [DISCONNECT] START")
         // Mark as intentionally disconnecting to skip delegate notifications
         isDisconnecting = true
 
@@ -154,10 +173,13 @@ final class LiveKitService: NSObject, ObservableObject, LiveKitServiceProtocol {
         stopRemoteDisconnectTimer()
 
         // Disconnect room (can take time)
+        debugLog("🔌 [DISCONNECT] Calling room.disconnect()...")
         await room.disconnect()
+        debugLog("🔌 [DISCONNECT] room.disconnect() completed")
 
         self.connectionState = .disconnected
         isDisconnecting = false
+        debugLog("🔌 [DISCONNECT] END")
     }
     
     func setRemoteAudioEnabled(_ enabled: Bool) async {
@@ -175,16 +197,22 @@ final class LiveKitService: NSObject, ObservableObject, LiveKitServiceProtocol {
 extension LiveKitService: RoomDelegate {
     nonisolated func room(_ room: Room, didUpdateConnectionState connectionState: ConnectionState, from oldConnectionState: ConnectionState) {
         Task { @MainActor in
+            self.debugLog("🔄 [STATE] \(oldConnectionState) → \(connectionState)")
+
             // Skip updates during intentional disconnect
-            guard !self.isDisconnecting else { return }
+            guard !self.isDisconnecting else {
+                self.debugLog("🔄 [STATE] Skipped (isDisconnecting=true)")
+                return
+            }
 
             self.connectionState = connectionState
             if connectionState == .connected {
+                self.debugLog("🔄 [STATE] ✅ Connected successfully!")
                 self.errorMessage = nil
                 self.reconnectMode = nil
                 self.stopReconnectTimer()
             } else if connectionState == .disconnected && oldConnectionState == .reconnecting {
-                // 재연결 실패로 완전히 끊김
+                self.debugLog("🔄 [STATE] ❌ Reconnect failed - disconnected")
                 self.stopReconnectTimer()
             }
             self.objectWillChange.send()
@@ -193,6 +221,7 @@ extension LiveKitService: RoomDelegate {
 
     nonisolated func room(_ room: Room, didStartReconnectWithMode reconnectMode: ReconnectMode) {
         Task { @MainActor in
+            self.debugLog("🔄 [RECONNECT] Started - mode=\(reconnectMode)")
             guard !self.isDisconnecting else { return }
             self.reconnectMode = reconnectMode
             self.connectionState = .reconnecting
@@ -203,6 +232,7 @@ extension LiveKitService: RoomDelegate {
 
     nonisolated func room(_ room: Room, didCompleteReconnectWithMode reconnectMode: ReconnectMode) {
         Task { @MainActor in
+            self.debugLog("🔄 [RECONNECT] Completed - mode=\(reconnectMode)")
             guard !self.isDisconnecting else { return }
             self.reconnectMode = nil
             self.connectionState = room.connectionState

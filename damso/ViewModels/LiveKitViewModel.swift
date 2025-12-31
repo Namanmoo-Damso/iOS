@@ -23,6 +23,7 @@ final class LiveKitViewModel<
     // UI State
     @Published var isRequestingToken = false
     @Published var activeRoomName = "demo-room"
+    private var isHandlingAutoAccept = false  // 중복 호출 방지
 
     // Proxy Properties
     var room: Room { liveKitService.room }
@@ -52,9 +53,11 @@ final class LiveKitViewModel<
         callStateStore.activeCallPublisher
             .receive(on: RunLoop.main)
             .sink { [weak self] call in
+                print("📱 [ViewModel] activeCallPublisher received: \(call?.status.debugDescription ?? "nil")")
                 self?.incomingCall = call
                 // .answered 상태면 자동으로 통화 시작
                 if let call, call.status == .answered {
+                    print("📱 [ViewModel] Call status is .answered - triggering handleAutoAccept")
                     self?.handleAutoAccept(call: call)
                 }
             }
@@ -63,10 +66,21 @@ final class LiveKitViewModel<
 
     /// 알림에서 수락 시 자동으로 통화 시작 (WiFi-only iPad)
     private func handleAutoAccept(call: CallInfo) {
+        // 중복 호출 방지
+        guard !isHandlingAutoAccept else {
+            print("📱 [ViewModel] handleAutoAccept SKIPPED - already handling")
+            return
+        }
+        isHandlingAutoAccept = true
+
+        print("📱 [ViewModel] handleAutoAccept START - roomName=\(call.roomName ?? "nil")")
         callStateStore.clearCall()
+        print("📱 [ViewModel] handleAutoAccept - callStateStore.clearCall() done")
         if let roomName = call.roomName {
+            print("📱 [ViewModel] handleAutoAccept - calling startCall(roomName: \(roomName))")
             startCall(roomName: roomName)
         } else {
+            print("📱 [ViewModel] handleAutoAccept - calling startCall() with default room")
             startCall()
         }
     }
@@ -129,33 +143,66 @@ final class LiveKitViewModel<
 
     // Actions
     func startCall(roomName: String? = nil) {
+        print("📱 [ViewModel] startCall START - roomName=\(roomName ?? "nil") activeRoomName=\(activeRoomName)")
         if let roomName {
             activeRoomName = roomName
         }
-        
+
+        print("📱 [ViewModel] startCall - isBusy=\(isBusy)")
+        guard !isBusy else {
+            print("📱 [ViewModel] startCall ABORTED - isBusy=true")
+            return
+        }
+
+        isRequestingToken = true
+        let currentRoom = activeRoomName
+
         Task {
-            guard !isBusy else { return }
-            
-            isRequestingToken = true
-            defer { isRequestingToken = false }
-            
+            print("📱 [ViewModel] startCall Task started")
+            defer {
+                Task { @MainActor in
+                    self.isRequestingToken = false
+                    print("📱 [ViewModel] startCall - token request completed")
+                }
+            }
+
             do {
-                let token = try await authService.fetchLiveKitToken(roomName: activeRoomName)
+                print("📱 [ViewModel] startCall - fetching LiveKit token for room: \(currentRoom)")
+                let token = try await authService.fetchLiveKitToken(roomName: currentRoom)
+                print("📱 [ViewModel] startCall - token received, length=\(token.count)")
+
+                // Task 취소 체크
+                try Task.checkCancellation()
+                print("📱 [ViewModel] startCall - Task not cancelled, connecting to LiveKit...")
+
                 try await liveKitService.connect(token: token)
+                print("📱 [ViewModel] startCall - LiveKit connected successfully!")
                 self.errorMessage = nil
+            } catch is CancellationError {
+                print("📱 [ViewModel] ⚠️ Task was cancelled - this might be the issue!")
             } catch let error as TokenError {
-                 print("[ViewModel] Token Error: \(error.localizedDescription)")
-                 self.errorMessage = "인증 실패: \(error.localizedDescription)"
+                print("📱 [ViewModel] ❌ Token Error: \(error.localizedDescription)")
+                self.errorMessage = "인증 실패: \(error.localizedDescription)"
             } catch {
-                print("[ViewModel] Start call failed: \(error.localizedDescription)")
+                print("📱 [ViewModel] ❌ Start call failed: \(error)")
+                print("📱 [ViewModel] ❌ Error type: \(type(of: error))")
                 self.errorMessage = "연결 실패: \(error.localizedDescription)"
             }
         }
     }
     
     func disconnect() {
+        print("📱 [ViewModel] disconnect() called")
+        isHandlingAutoAccept = false  // 플래그 리셋
+
         Task {
             await liveKitService.disconnect()
+        }
+
+        // CallKit 통화도 함께 종료
+        if let call = incomingCall {
+            print("📱 [ViewModel] disconnect() - ending CallKit call")
+            callManager.endCall(uuid: call.id)
         }
     }
     

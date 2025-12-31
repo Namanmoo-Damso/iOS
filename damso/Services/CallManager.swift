@@ -2,10 +2,18 @@ import CallKit
 import Foundation
 import Combine
 
-enum CallStatus {
+enum CallStatus: CustomDebugStringConvertible {
     case ringing
     case answered
     case ended
+
+    var debugDescription: String {
+        switch self {
+        case .ringing: return "ringing"
+        case .answered: return "answered"
+        case .ended: return "ended"
+        }
+    }
 }
 
 struct CallInfo: Identifiable {
@@ -194,8 +202,11 @@ extension CallManager: CXProviderDelegate {
 
     func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
         let uuid = action.callUUID
-        debugLog("provider answerCall action uuid=\(uuid.uuidString)")
+        debugLog("📞 [ANSWER] START - uuid=\(uuid.uuidString)")
+        debugLog("📞 [ANSWER] callId=\(callIdByUUID[uuid] ?? "nil") roomName=\(roomByUUID[uuid] ?? "nil")")
+
         if let callId = callIdByUUID[uuid] {
+            debugLog("📞 [ANSWER] Sending /v1/calls/answer API")
             sendCallState(callId: callId, endpoint: "/v1/calls/answer")
         }
 
@@ -205,6 +216,7 @@ extension CallManager: CXProviderDelegate {
         let handle = handleByUUID[uuid] ?? "Unknown"
         let hasVideo = hasVideoByUUID[uuid] ?? true
 
+        debugLog("📞 [ANSWER] Setting CallStateStore.setAnswered")
         Task { @MainActor in
             CallStateStore.shared.setAnswered(
                 uuid: uuid,
@@ -213,12 +225,12 @@ extension CallManager: CXProviderDelegate {
                 hasVideo: hasVideo,
                 roomName: roomName
             )
+            self.debugLog("📞 [ANSWER] CallStateStore.setAnswered completed")
         }
-        action.fulfill()
 
-        // CallKit UI 자동 종료 (앱 내 통화로 전환)
-        provider.reportCall(with: uuid, endedAt: nil, reason: .answeredElsewhere)
-        cleanupCall(uuid: uuid)
+        debugLog("📞 [ANSWER] Calling action.fulfill()")
+        action.fulfill()
+        debugLog("📞 [ANSWER] END - CallKit session maintained for background audio/video")
     }
 
     func provider(_ provider: CXProvider, perform action: CXEndCallAction) {

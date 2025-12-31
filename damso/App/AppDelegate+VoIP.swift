@@ -48,6 +48,10 @@ extension AppDelegate: PKPushRegistryDelegate {
         let callId = payloadData["callId"] as? String ?? payloadData["call_id"] as? String
         let type = (payloadData["type"] as? String)?.uppercased() ?? "INVITE"
 
+        print("📥 [VoIP] ========== PUSH RECEIVED ==========")
+        print("📥 [VoIP] type=\(type) callId=\(callId ?? "nil")")
+        print("📥 [VoIP] keys=[\(payloadKeys)]")
+        print("📥 [VoIP] payload=\(payloadData)")
         debugLog("voip push received type=\(type) keys=[\(payloadKeys)] callId=\(callId ?? "nil")")
         diagLog("voip push received type=\(type) keys=[\(payloadKeys)] callId=\(callId ?? "nil")")
 
@@ -72,6 +76,9 @@ extension AppDelegate: PKPushRegistryDelegate {
             ?? true
         let uuid = UUID(uuidString: callId ?? "") ?? UUID()
 
+        print("📥 [VoIP] Reporting incoming call to CallKit")
+        print("📥 [VoIP] uuid=\(uuid) caller=\(caller) roomName=\(roomName ?? "nil") hasVideo=\(hasVideo)")
+
         callManager.reportIncomingCall(
             uuid: uuid,
             handle: caller,
@@ -80,7 +87,9 @@ extension AppDelegate: PKPushRegistryDelegate {
             roomName: roomName
         ) { error in
             if let error = error {
-                print("CallKit report failed:", error)
+                print("📥 [VoIP] ❌ CallKit report failed: \(error)")
+            } else {
+                print("📥 [VoIP] ✅ CallKit report success")
             }
             completion?()
         }
