@@ -117,3 +117,7 @@ scripts/
 CLAUDE.md
 deployment_fix_instructions.txt
 user_question.txt
+docs/
+
+# Auto Claude data directory
+.auto-claude/

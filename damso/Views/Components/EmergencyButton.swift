@@ -19,9 +19,8 @@ struct EmergencyButton: View {
         Button {
             showConfirmation = true
         } label: {
-            Image(systemName: "sos")
+            Image(systemName: "light.beacon.max.fill")
                 .font(.title2)
-                .fontWeight(.bold)
                 .foregroundColor(.white)
                 .frame(width: 44, height: 44)
                 .background(Color.red)

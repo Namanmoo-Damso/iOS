@@ -79,23 +79,49 @@ final class EmergencyService {
 
 // MARK: - Emergency Type
 
-enum EmergencyType: String {
-    case manual = "manual"
-    case fall = "fall"
-    case health = "health"
-    case other = "other"
+/// 비상 유형 (백엔드: string - 확장 가능)
+enum EmergencyType: String, Codable {
+    case health = "health"    // 건강 관련 비상
+    case safety = "safety"    // 안전 관련 비상
+    case fall = "fall"        // 낙상
+    case manual = "manual"    // 수동 호출
+    case unknown              // 알 수 없는 타입
 
     var defaultMessage: String {
         switch self {
-        case .manual:
-            return "비상 버튼이 눌렸습니다"
-        case .fall:
-            return "낙상이 감지되었습니다"
         case .health:
             return "건강 이상이 감지되었습니다"
-        case .other:
+        case .safety:
+            return "안전 관련 비상 상황이 발생했습니다"
+        case .fall:
+            return "낙상이 감지되었습니다"
+        case .manual:
+            return "비상 버튼이 눌렸습니다"
+        case .unknown:
             return "긴급 상황이 발생했습니다"
         }
+    }
+
+    var displayName: String {
+        switch self {
+        case .health:
+            return "건강 비상"
+        case .safety:
+            return "안전 비상"
+        case .fall:
+            return "낙상 감지"
+        case .manual:
+            return "수동 호출"
+        case .unknown:
+            return "비상"
+        }
+    }
+
+    // 알 수 없는 타입 처리
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = try container.decode(String.self)
+        self = EmergencyType(rawValue: rawValue) ?? .unknown
     }
 }
 

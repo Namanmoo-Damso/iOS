@@ -151,11 +151,13 @@ struct UserMeResponse: Codable {
 
 /// 보호자 상세 정보 응답
 struct GuardianInfoResponse: Codable {
+    let id: String  // 보호자 고유 ID (필수)
     let wardEmail: String
     let wardPhoneNumber: String
     let linkedWard: WardSummary?
 
     enum CodingKeys: String, CodingKey {
+        case id
         case wardEmail = "ward_email"
         case wardPhoneNumber = "ward_phone_number"
         case linkedWard = "linked_ward"
@@ -164,11 +166,13 @@ struct GuardianInfoResponse: Codable {
 
 /// 어르신 상세 정보 응답
 struct WardInfoResponse: Codable {
+    let id: String  // 어르신 고유 ID (필수)
     let phoneNumber: String
     let linkedGuardian: GuardianSummary?
     let linkedOrganization: OrganizationSummary?
 
     enum CodingKeys: String, CodingKey {
+        case id
         case phoneNumber = "phone_number"
         case linkedGuardian = "linked_guardian"
         case linkedOrganization = "linked_organization"
@@ -431,6 +435,104 @@ struct WardMatchResponse: Codable {
         case linkedOrganization = "linked_organization"
         case message
     }
+}
+
+// MARK: - 통화 관련 응답
+
+/// POST /v1/calls/invite 응답 (camelCase)
+struct InviteCallResponse: Codable {
+    let callId: String
+    let roomName: String
+    let state: String
+    let deduped: Bool
+    let push: PushResultDetail
+}
+
+/// 푸시 결과 상세
+struct PushResultDetail: Codable {
+    let sent: Int
+    let failed: Int
+    let invalidTokens: [String]  // 빈 배열 가능, non-optional
+    let voip: PushStat           // non-optional (필수)
+    let alert: PushStat          // non-optional (필수)
+}
+
+/// 푸시 통계 (VoIP/Alert 별)
+struct PushStat: Codable {
+    let sent: Int
+    let failed: Int
+}
+
+/// 통화 상태 응답 (snake_case - DB 컬럼 그대로 반환)
+struct CallStateResponse: Codable {
+    let id: String
+    let roomName: String
+    let callerIdentity: String
+    let calleeIdentity: String
+    let state: String
+    let createdAt: String
+    let answeredAt: String?
+    let endedAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, state
+        case roomName = "room_name"
+        case callerIdentity = "caller_identity"
+        case calleeIdentity = "callee_identity"
+        case createdAt = "created_at"
+        case answeredAt = "answered_at"
+        case endedAt = "ended_at"
+    }
+}
+
+// MARK: - 디바이스 등록 요청
+
+/// POST /v1/devices/register 요청
+struct RegisterDeviceRequest: Codable {
+    let identity: String?
+    let displayName: String?
+    let platform: String
+    let env: String
+    let apnsToken: String?
+    let voipToken: String?
+    let supportsCallKit: Bool
+
+    init(
+        identity: String? = nil,
+        displayName: String? = nil,
+        platform: String = "ios",
+        env: String,
+        apnsToken: String? = nil,
+        voipToken: String? = nil,
+        supportsCallKit: Bool = true
+    ) {
+        self.identity = identity
+        self.displayName = displayName
+        self.platform = platform
+        self.env = env
+        self.apnsToken = apnsToken
+        self.voipToken = voipToken
+        self.supportsCallKit = supportsCallKit
+    }
+}
+
+// MARK: - 위치/비상 요청
+
+/// POST /v1/ward/location 요청
+struct UpdateLocationRequest: Codable {
+    let latitude: Double
+    let longitude: Double
+    let accuracy: Double?
+    let timestamp: String?
+}
+
+/// POST /v1/ward/emergency 요청
+struct TriggerEmergencyRequest: Codable {
+    let type: String
+    let message: String?
+    let latitude: Double?
+    let longitude: Double?
+    let accuracy: Double?
 }
 
 // MARK: - JSON Decoder Helper
