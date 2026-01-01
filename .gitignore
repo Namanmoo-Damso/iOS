@@ -118,6 +118,7 @@ CLAUDE.md
 deployment_fix_instructions.txt
 user_question.txt
 docs/
+livekit_composite/
 
 # Auto Claude data directory
 .auto-claude/
