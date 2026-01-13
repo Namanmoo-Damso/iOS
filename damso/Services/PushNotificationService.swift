@@ -45,11 +45,10 @@ final class PushNotificationService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
 
-        let identity = stableIdentity()
         let supportsCallKit = resolveCallCapability() == .callKit
 
+        // identity는 서버가 JWT에서 추출하므로 body에 포함하지 않음
         var body: [String: Any] = [
-            "identity": identity,
             "platform": "ios",
             "env": apnsEnv,
             "supportsCallKit": supportsCallKit
@@ -78,17 +77,6 @@ final class PushNotificationService {
     /// 단일 APNs 토큰 등록 (하위 호환)
     func registerDeviceToken(_ token: String) async throws {
         try await registerDeviceTokens(apnsToken: token)
-    }
-
-    // MARK: - Private Helpers
-
-    private func stableIdentity() -> String {
-        if let stored = UserDefaults.standard.userIdentity {
-            return stored
-        }
-        let newIdentity = "ios-\(UUID().uuidString)"
-        UserDefaults.standard.userIdentity = newIdentity
-        return newIdentity
     }
 
     /// 알림 설정 서버에 동기화

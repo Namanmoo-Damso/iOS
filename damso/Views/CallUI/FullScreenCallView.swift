@@ -5,13 +5,13 @@ import LiveKit
 struct FullScreenCallView: View {
     @ObservedObject var viewModel: AppLiveKitViewModel
     @ObservedObject private var networkMonitor = NetworkMonitor.shared
+    @ObservedObject private var audioVisualizer = AudioVisualizerManager.shared
+    @ObservedObject private var transcription = TranscriptionManager.shared
 
     // Shortcut accessors
     var room: Room { viewModel.room }
     var localMedia: LocalMedia { viewModel.localMedia }
 
-    // Local state
-    @State private var isRemoteVideoVisible = true
     @State private var isRemoteAudioEnabled = true
     @State private var showNetworkAlert = false
     @State private var showCellularWarning = false
@@ -22,11 +22,31 @@ struct FullScreenCallView: View {
     @State private var selectedVideoQuality: VideoQualityPreset = .auto
     @State private var isQualitySelectorExpanded = false
 
+    // PIP 확대 모드 상태
+    @State private var isPIPExpanded: Bool = false
+    @State private var showPIPMesh: Bool = false
+
     let onDismiss: () -> Void
 
     init(viewModel: AppLiveKitViewModel, onDismiss: @escaping () -> Void) {
         self.viewModel = viewModel
         self.onDismiss = onDismiss
+    }
+
+    /// AI 음성통화 모드인지 확인
+    private var isAudioOnlyMode: Bool {
+        room.remoteParticipants.count > 0 && !isRemoteVideoActive
+    }
+
+    /// AI 대사 표시 텍스트
+    private var aiDisplayText: String {
+        if !transcription.currentAgentText.isEmpty {
+            return transcription.currentAgentText
+        }
+        if let lastAgentMessage = transcription.messages.last(where: { $0.isAgent }) {
+            return lastAgentMessage.text
+        }
+        return ""
     }
 
     var body: some View {
@@ -37,84 +57,79 @@ struct FullScreenCallView: View {
 
             // UI Overlay
             VStack(spacing: 0) {
-                // Top bar
-                CallTopBar(
-                    callerName: remoteParticipantName,
-                    callDuration: callDuration,
-                    isConnected: viewModel.isConnected,
-                    remoteConnectionQuality: remoteConnectionQuality
-                )
+                // 상단 영역
+                ZStack(alignment: .top) {
+                    // 중앙 - 이름 및 통화시간
+                    CallTopBar(
+                        callerName: isAudioOnlyMode ? "소담이" : remoteParticipantName,
+                        callDuration: callDuration,
+                        isConnected: viewModel.isConnected,
+                        remoteConnectionQuality: remoteConnectionQuality
+                    )
 
-                Spacer()
-
-                // Video quality selector (above control bar)
-                VideoQualitySelector(
-                    selectedQuality: $selectedVideoQuality,
-                    isExpanded: $isQualitySelectorExpanded,
-                    currentResolution: currentResolutionString
-                )
-                .padding(.bottom, 12)
-                .onChange(of: selectedVideoQuality) { _, newQuality in
-                    Task {
-                        await changeVideoQuality(to: newQuality)
-                    }
-                }
-
-                // Bottom control bar
-                CallControlBar(
-                    isMicEnabled: localMedia.isMicrophoneEnabled,
-                    isCameraEnabled: localMedia.isCameraEnabled,
-                    isSpeakerEnabled: isRemoteAudioEnabled,
-                    isRemoteVideoVisible: isRemoteVideoVisible,
-                    canSwitchCamera: localMedia.canSwitchCamera,
-                    onToggleMic: {
-                        Task { await localMedia.toggleMicrophone() }
-                    },
-                    onToggleCamera: {
-                        Task { await localMedia.toggleCamera() }
-                    },
-                    onEndCall: {
-                        // Dismiss UI immediately for responsive feedback
-                        onDismiss()
-                        // Then disconnect in background
-                        viewModel.disconnect()
-                    },
-                    onFlipCamera: {
-                        Task { await localMedia.switchCamera() }
-                    },
-                    onToggleSpeaker: {
-                        isRemoteAudioEnabled.toggle()
-                        Task {
-                            await viewModel.setRemoteAudioEnabled(isRemoteAudioEnabled)
+                    // 좌상단 - 듣는중/말하는중 상태 (AI 모드일 때만)
+                    if isAudioOnlyMode {
+                        HStack {
+                            SpeakingStatusIndicator(status: transcription.isAISpeaking ? .talking : .listening)
+                                .padding(.leading, 16)
+                                .padding(.top, 8)
+                            Spacer()
                         }
-                    },
-                    onToggleRemoteVideo: {
-                        isRemoteVideoVisible.toggle()
                     }
-                )
-            }
 
-            // Local video PIP (top right) with network indicator
-            VStack {
-                HStack {
-                    Spacer()
-                    VStack(spacing: 8) {
-                        LocalVideoPIP(
-                            track: localMedia.cameraTrack,
-                            isCameraEnabled: localMedia.isCameraEnabled,
-                            isMicEnabled: localMedia.isMicrophoneEnabled
-                        )
-
-                        // My network status indicator
-                        MyNetworkStatusView(
-                            connectionQuality: room.localParticipant.connectionQuality,
-                            connectionType: networkMonitor.connectionType
-                        )
+                    // 우상단 - 네트워크 상태 (확대 모드가 아닐 때만)
+                    if !isPIPExpanded {
+                        HStack {
+                            Spacer()
+                            VStack(spacing: 8) {
+                                // 내 네트워크 상태 표시
+                                MyNetworkStatusView(
+                                    connectionQuality: room.localParticipant.connectionQuality,
+                                    connectionType: networkMonitor.connectionType
+                                )
+                            }
+                            .padding(.trailing, 16)
+                            .padding(.top, 8)
+                        }
                     }
-                    .padding(.trailing, 16)
-                    .padding(.top, 60)
                 }
+
                 Spacer()
+
+                // 영상통화일 때만 화질 선택기 표시
+                if !isAudioOnlyMode && localMedia.isCameraEnabled {
+                    VideoQualitySelector(
+                        selectedQuality: $selectedVideoQuality,
+                        isExpanded: $isQualitySelectorExpanded,
+                        currentResolution: currentResolutionString
+                    )
+                    .padding(.bottom, 12)
+                    .onChange(of: selectedVideoQuality) { _, newQuality in
+                        Task {
+                            await changeVideoQuality(to: newQuality)
+                        }
+                    }
+                }
+
+                // AI 대사 (음성통화 모드일 때)
+                if isAudioOnlyMode && !aiDisplayText.isEmpty {
+                    AIChatBubbleView(
+                        text: aiDisplayText,
+                        isFinal: transcription.currentAgentText.isEmpty
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
+                }
+
+                bottomOverlay
+            }
+            .onTapGesture {
+                // 다른 곳 탭하면 화질 선택기 닫기
+                if isQualitySelectorExpanded {
+                    withAnimation {
+                        isQualitySelectorExpanded = false
+                    }
+                }
             }
 
             // Incoming call banner
@@ -128,6 +143,39 @@ struct FullScreenCallView: View {
                     .padding(.top, 60)
                     Spacer()
                 }
+            }
+
+            // 확대된 PIP 배경 딤 효과
+            if isPIPExpanded {
+                Color.black.opacity(0.7)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            showPIPMesh = false
+                            isPIPExpanded = false
+                        }
+                    }
+            }
+
+            // 단일 LocalVideoPIP 인스턴스 - 위치만 상태에 따라 변경
+            GeometryReader { geometry in
+                LocalVideoPIP(
+                    track: localMedia.cameraTrack,
+                    isCameraEnabled: localMedia.isCameraEnabled,
+                    isMicEnabled: localMedia.isMicrophoneEnabled,
+                    isCompact: !isPIPExpanded,
+                    isExpanded: $isPIPExpanded,
+                    showMesh: $showPIPMesh
+                )
+                .position(
+                    x: isPIPExpanded
+                        ? geometry.size.width / 2
+                        : geometry.size.width - pipSize(screenWidth: geometry.size.width).width / 2 - 16,
+                    y: isPIPExpanded
+                        ? geometry.size.height / 2
+                        : pipSize(screenWidth: geometry.size.width).height / 2 + 60
+                )
+                .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isPIPExpanded)
             }
 
             // Reconnecting overlay
@@ -147,14 +195,6 @@ struct FullScreenCallView: View {
             }
         }
         .statusBar(hidden: true)
-        .onTapGesture {
-            // Close quality selector when tapping elsewhere
-            if isQualitySelectorExpanded {
-                withAnimation {
-                    isQualitySelectorExpanded = false
-                }
-            }
-        }
         .onChange(of: networkMonitor.isConnected) { _, isConnected in
             if !isConnected {
                 showNetworkAlert = true
@@ -207,21 +247,18 @@ struct FullScreenCallView: View {
         return firstParticipant.connectionQuality
     }
 
-    // MARK: - Current Resolution String
+    // MARK: - Video Quality
 
     private var currentResolutionString: String? {
         if selectedVideoQuality == .auto {
-            // Return the actual resolution being used (default 720p for auto)
             return "720p"
         }
         return nil
     }
 
-    // MARK: - Video Quality
-
     private func changeVideoQuality(to quality: VideoQualityPreset) async {
         guard let dimensions = quality.dimensions else {
-            // Auto mode - use default 720p
+            // Auto mode - 기본 720p 사용
             let captureOptions = CameraCaptureOptions(dimensions: .h720_169)
             _ = try? await room.localParticipant.setCamera(enabled: localMedia.isCameraEnabled, captureOptions: captureOptions)
             return
@@ -231,24 +268,97 @@ struct FullScreenCallView: View {
         _ = try? await room.localParticipant.setCamera(enabled: localMedia.isCameraEnabled, captureOptions: captureOptions)
     }
 
-    // MARK: - Remote Video Background
+    // MARK: - Call Stage State
+
+    /// 현재 통화 상태 계산
+    private var currentCallState: CallStageState {
+        if !viewModel.isConnected {
+            return .connecting
+        } else if let firstRemote = remoteVideoItems.first, isRemoteVideoActive {
+            return .videoCall(track: firstRemote.track)
+        } else if room.remoteParticipants.count > 0 {
+            return .audioCall
+        } else {
+            return .waitingForParticipant
+        }
+    }
+
+    /// 원격 참가자가 실제로 비디오를 송출하고 있는지 확인
+    private var isRemoteVideoActive: Bool {
+        guard !remoteVideoItems.isEmpty else { return false }
+        if let publication = room.remoteParticipants.values.first?.videoTracks.first {
+            return !publication.isMuted && publication.isSubscribed
+        }
+        return true
+    }
+
+    // MARK: - Background
 
     @ViewBuilder
     private var remoteVideoBackground: some View {
-        if !viewModel.isConnected {
-            WaitingCallBackground(isConnected: viewModel.isConnected, isBusy: viewModel.isBusy)
-        } else if let firstRemote = remoteVideoItems.first {
-            if isRemoteVideoVisible {
-                SwiftUIVideoView(firstRemote.track, layoutMode: .fill, mirrorMode: .off)
-                    .background(Color.black)
-            } else {
-                RemoteVideoHiddenBackground()
+        switch currentCallState {
+        case .connecting:
+            Color.black
+            VStack(spacing: 20) {
+                ProgressView()
+                    .tint(.white)
+                    .scaleEffect(1.5)
+                Text("연결 중...")
+                    .font(.title2)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white.opacity(0.8))
             }
-        } else if room.remoteParticipants.count > 0 {
-            AudioOnlyCallBackground()
-        } else {
-            WaitingCallBackground(isConnected: viewModel.isConnected, isBusy: viewModel.isBusy)
+
+        case .waitingForParticipant:
+            Color.black
+            VStack(spacing: 20) {
+                Image(systemName: "person.2.slash")
+                    .font(.system(size: 60))
+                    .foregroundColor(.white.opacity(0.5))
+                    .symbolEffect(.pulse)
+                Text("참가자 대기 중...")
+                    .font(.title2)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white.opacity(0.8))
+                if viewModel.isBusy {
+                    ProgressView()
+                        .tint(.white)
+                        .scaleEffect(1.2)
+                }
+            }
+
+        case .videoCall(let track):
+            SwiftUIVideoView(track, layoutMode: .fill, mirrorMode: .off)
+
+        case .audioCall:
+            // 베이지색 배경 + 캐릭터 비디오
+            GeometryReader { geometry in
+                let videoWidth = geometry.size.width * 0.95
+                let videoHeight = videoWidth / (896.0 / 1024.0)
+                // dock(80) + 말풍선 여유(120) + safe area 대략(34)
+                let bottomPadding: CGFloat = 234
+
+                ZStack {
+                    Color(hex: "E8E4DF")
+                    VStack(spacing: 0) {
+                        Spacer()
+                        DualStateVideoPlayer(isAISpeaking: transcription.isAISpeaking)
+                            .frame(width: videoWidth, height: videoHeight)
+                            .clipped()
+                    }
+                    .padding(.bottom, bottomPadding)
+                }
+            }
         }
+    }
+
+    // MARK: - PIP Size
+
+    /// PIP 크기 계산 (LocalVideoPIP과 동일 로직)
+    private func pipSize(screenWidth: CGFloat) -> CGSize {
+        let width = screenWidth / 3 * 0.8
+        let height = width * 4 / 3
+        return CGSize(width: width, height: height)
     }
 
     // MARK: - Helpers
@@ -323,6 +433,60 @@ struct FullScreenCallView: View {
         }
         pendingCallRoomName = nil
         pendingIncomingCall = false
+    }
+}
+
+private extension FullScreenCallView {
+    var bottomOverlay: some View {
+        CallControlBar(
+            isMicEnabled: localMedia.isMicrophoneEnabled,
+            isSpeakerEnabled: isRemoteAudioEnabled,
+            isCameraEnabled: localMedia.isCameraEnabled,
+            onToggleMic: {
+                Task { await localMedia.toggleMicrophone() }
+            },
+            onEndCall: {
+                onDismiss()
+                viewModel.disconnect()
+            },
+            onToggleSpeaker: {
+                isRemoteAudioEnabled.toggle()
+                Task {
+                    await viewModel.setRemoteAudioEnabled(isRemoteAudioEnabled)
+                }
+            },
+            onToggleCamera: {
+                Task { await localMedia.toggleCamera() }
+            }
+        )
+        .background(Color.black)
+    }
+}
+
+// MARK: - Remote Video Item
+
+struct RemoteVideoItem: Identifiable {
+    let id: String
+    let name: String
+    let track: VideoTrack
+}
+
+// MARK: - Call Stage State
+
+enum CallStageState: Equatable {
+    case connecting
+    case waitingForParticipant
+    case videoCall(track: VideoTrack)
+    case audioCall
+
+    static func == (lhs: CallStageState, rhs: CallStageState) -> Bool {
+        switch (lhs, rhs) {
+        case (.connecting, .connecting): return true
+        case (.waitingForParticipant, .waitingForParticipant): return true
+        case (.videoCall, .videoCall): return true
+        case (.audioCall, .audioCall): return true
+        default: return false
+        }
     }
 }
 #endif

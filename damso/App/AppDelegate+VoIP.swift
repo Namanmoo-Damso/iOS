@@ -1,4 +1,5 @@
 import PushKit
+import UIKit
 
 // MARK: - PKPushRegistryDelegate
 
@@ -76,22 +77,64 @@ extension AppDelegate: PKPushRegistryDelegate {
             ?? true
         let uuid = UUID(uuidString: callId ?? "") ?? UUID()
 
-        print("📥 [VoIP] Reporting incoming call to CallKit")
+        // 앱 상태 확인
+        let isForeground = UIApplication.shared.applicationState == .active
+
+        print("📥 [VoIP] App state: \(isForeground ? "FOREGROUND" : "BACKGROUND")")
         print("📥 [VoIP] uuid=\(uuid) caller=\(caller) roomName=\(roomName ?? "nil") hasVideo=\(hasVideo)")
 
-        callManager.reportIncomingCall(
-            uuid: uuid,
-            handle: caller,
-            hasVideo: hasVideo,
-            callId: callId,
-            roomName: roomName
-        ) { error in
-            if let error = error {
-                print("📥 [VoIP] ❌ CallKit report failed: \(error)")
-            } else {
-                print("📥 [VoIP] ✅ CallKit report success")
+        if isForeground {
+            // Foreground: Custom UI 사용, CallKit 리포트 후 즉시 종료
+            print("📥 [VoIP] 🎨 Foreground - Using custom incoming call UI")
+
+            // CallKit에 리포트 (iOS 필수 요구사항)
+            callManager.reportIncomingCall(
+                uuid: uuid,
+                handle: caller,
+                hasVideo: hasVideo,
+                callId: callId,
+                roomName: roomName
+            ) { [self] error in
+                if let error = error {
+                    print("📥 [VoIP] ❌ CallKit report failed: \(error)")
+                } else {
+                    print("📥 [VoIP] ✅ CallKit reported, immediately ending to hide UI")
+                    // CallKit UI가 뜨기 전에 즉시 종료 (reason: answeredElsewhere로 우리가 처리한다고 알림)
+                    Task { @MainActor in
+                        self.callManager.reportCallEnded(uuid: uuid, reason: .answeredElsewhere)
+                    }
+                }
+
+                // Custom UI 표시
+                Task { @MainActor in
+                    CallStateStore.shared.setIncoming(
+                        uuid: uuid,
+                        callId: callId,
+                        handle: caller,
+                        hasVideo: hasVideo,
+                        roomName: roomName
+                    )
+                }
+                completion?()
             }
-            completion?()
+        } else {
+            // Background: 일반 CallKit 플로우
+            print("📥 [VoIP] 📱 Background - Using CallKit UI")
+
+            callManager.reportIncomingCall(
+                uuid: uuid,
+                handle: caller,
+                hasVideo: hasVideo,
+                callId: callId,
+                roomName: roomName
+            ) { error in
+                if let error = error {
+                    print("📥 [VoIP] ❌ CallKit report failed: \(error)")
+                } else {
+                    print("📥 [VoIP] ✅ CallKit report success")
+                }
+                completion?()
+            }
         }
     }
 }

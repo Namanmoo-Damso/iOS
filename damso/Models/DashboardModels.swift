@@ -11,11 +11,12 @@ import Foundation
 
 /// 보호자 대시보드 응답
 struct GuardianDashboardResponse: Codable {
+    let wardId: String?         // 조회된 어르신 ID
+    let wardName: String?       // 어르신 이름
     let statistics: DashboardStatistics
+    let aiSummary: String?      // 서버에서 생성한 AI 요약 메시지
     let alerts: [DashboardAlert]
     let recentCalls: [RecentCall]
-
-    // 서버가 camelCase로 응답하므로 CodingKeys 불필요
 }
 
 /// 대시보드 통계
@@ -68,12 +69,15 @@ struct RecentCall: Codable, Identifiable {
 #if DEBUG
 extension GuardianDashboardResponse {
     static let mock = GuardianDashboardResponse(
+        wardId: "mock-ward-id",
+        wardName: "홍길동",
         statistics: DashboardStatistics(
             totalCalls: 24,
             weeklyChange: 3,
             averageDuration: 11,
             overallMood: MoodStatistics(positive: 85, negative: 15)
         ),
+        aiSummary: "보호자님! 아버님이 오늘 컨디션이 아주 좋으세요.",
         alerts: [
             DashboardAlert(
                 id: "1",

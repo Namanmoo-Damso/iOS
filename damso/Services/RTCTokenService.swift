@@ -31,19 +31,10 @@ final class RTCTokenService: RTCTokenProtocol {
 
     /// LiveKit 접속용 토큰 발급
     func fetchLiveKitToken(roomName: String) async throws -> String {
-        // JWT 토큰이 있으면 JWT 사용, 없으면 익명 토큰 사용
-        let authToken: String
-        if let jwtToken = TokenManager.shared.accessToken {
-            authToken = jwtToken
-        } else {
-            var legacyToken = UserDefaults.standard.legacyAuthToken
-            if legacyToken == nil || legacyToken?.isEmpty == true {
-                legacyToken = try await fetchApiToken()
-            }
-            guard let token = legacyToken else {
-                throw TokenError.missingAuthToken
-            }
-            authToken = token
+        // JWT 토큰 필수 (카카오 로그인 후에만 통화 가능)
+        guard let authToken = TokenManager.shared.accessToken else {
+            Log.auth.e("No JWT token - user must be logged in via Kakao")
+            throw TokenError.missingAuthToken
         }
 
         guard let tokenEndpoint = URL(string: "\(AppConfig.apiBaseURL)/v1/rtc/token") else {
@@ -56,7 +47,7 @@ final class RTCTokenService: RTCTokenProtocol {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
 
-        let identity = stableIdentity()
+        // identity는 서버가 JWT에서 추출하므로 body에 포함하지 않음
         let cachedApns = UserDefaults.standard.cachedApnsToken
         let cachedVoip = UserDefaults.standard.cachedVoipToken
 
@@ -64,8 +55,6 @@ final class RTCTokenService: RTCTokenProtocol {
 
         var body: [String: Any] = [
             "roomName": roomName,
-            "identity": identity,
-            "name": "iOS User",
             "role": "viewer",
             "platform": "ios",
             "env": apnsEnv,
@@ -104,8 +93,27 @@ final class RTCTokenService: RTCTokenProtocol {
                     Log.auth.e("Token refresh failed: \(error)")
                 }
             }
-            UserDefaults.standard.clearLegacyAuthToken()
             throw TokenError.httpStatus(code: 401, body: "Unauthorized - Token might be expired")
+        }
+        
+        // 503 (서버 용량 초과) 또는 409 (이미 통화 중) 에러 처리
+        if httpResponse.statusCode == 503 || httpResponse.statusCode == 409 {
+            if let errorResponse = try? JSONDecoder().decode(APIResponse<EmptyResponse>.self, from: data),
+               let errorCode = errorResponse.error?.code {
+                switch errorCode {
+                case APIErrorCode.serverAtCapacity.rawValue:
+                    Log.livekit.e("Server at capacity - too many concurrent calls")
+                    throw TokenError.serverAtCapacity
+                case APIErrorCode.callAlreadyActive.rawValue:
+                    Log.livekit.e("Call already active for this user")
+                    throw TokenError.callAlreadyActive
+                default:
+                    break
+                }
+            }
+            // 에러 코드 파싱 실패 시 기본 처리
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw TokenError.httpStatus(code: httpResponse.statusCode, body: body)
         }
 
         guard (200..<300).contains(httpResponse.statusCode) else {
@@ -120,50 +128,41 @@ final class RTCTokenService: RTCTokenProtocol {
         print("🎫 [Token] Parsed token length: \(token.count)")
         return token
     }
-
-    /// 익명 API 토큰 발급 (Legacy)
-    func fetchApiToken() async throws -> String {
-        let identity = stableIdentity()
-        guard let url = URL(string: "\(AppConfig.apiBaseURL)/v1/auth/anonymous") else {
-            throw TokenError.networkError("Invalid auth URL")
-        }
-
-        var req = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: Numbers.Timeout.tokenRefresh)
-        req.httpMethod = "POST"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        let data: Data
-        let response: URLResponse
-
-        do {
-            req.httpBody = try JSONSerialization.data(withJSONObject: [
-                "identity": identity,
-                "displayName": "iOS User"
-            ])
-            (data, response) = try await URLSession.shared.data(for: req)
-        } catch {
-            throw TokenError.networkError(error.localizedDescription)
-        }
-
-        if let httpResponse = response as? HTTPURLResponse {
-            if !(200..<300).contains(httpResponse.statusCode) {
-                let bodyText = String(data: data, encoding: .utf8) ?? ""
-                throw TokenError.httpStatus(code: httpResponse.statusCode, body: bodyText)
+    
+    /// LiveKit 토큰 발급 (재시도 로직 포함)
+    /// - Parameters:
+    ///   - roomName: 방 이름
+    ///   - maxRetries: 최대 재시도 횟수 (기본값: 3)
+    ///   - retryDelay: 재시도 간격 (초, 기본값: 2.0)
+    /// - Returns: LiveKit 토큰
+    func fetchLiveKitTokenWithRetry(
+        roomName: String,
+        maxRetries: Int = 3,
+        retryDelay: TimeInterval = 2.0
+    ) async throws -> String {
+        var lastError: Error?
+        
+        for attempt in 1...maxRetries {
+            do {
+                return try await fetchLiveKitToken(roomName: roomName)
+            } catch let error as TokenError {
+                lastError = error
+                
+                // 재시도 가능한 에러인 경우에만 재시도
+                if error.isRetryable && attempt < maxRetries {
+                    Log.livekit.i("Token fetch failed (attempt \(attempt)/\(maxRetries)), retrying in \(retryDelay)s...")
+                    try await Task.sleep(nanoseconds: UInt64(retryDelay * 1_000_000_000))
+                    continue
+                }
+                
+                throw error
+            } catch {
+                lastError = error
+                throw error
             }
         }
-
-        do {
-            guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let token = json["accessToken"] as? String else {
-                throw TokenError.missingToken
-            }
-            UserDefaults.standard.legacyAuthToken = token
-            Log.auth.i("API token stored")
-            return token
-        } catch {
-            if let tokenErr = error as? TokenError { throw tokenErr }
-            throw TokenError.networkError("JSON Parsing Error")
-        }
+        
+        throw lastError ?? TokenError.networkError("Max retries exceeded")
     }
 
     // MARK: - Private Helpers
@@ -179,6 +178,7 @@ final class RTCTokenService: RTCTokenProtocol {
         struct TokenEnvelope: Decodable {
             let token: String?
             let accessToken: String?
+            let livekitUrl: String?
             let data: Nested?
             let result: Nested?
 
@@ -195,6 +195,12 @@ final class RTCTokenService: RTCTokenProtocol {
             throw TokenError.networkError("JSON Decode Failed")
         }
 
+        // livekitUrl이 있으면 저장 (LiveKitService에서 사용)
+        if let livekitUrl = response.livekitUrl, !livekitUrl.isEmpty {
+            UserDefaults.standard.set(livekitUrl, forKey: "cachedLiveKitUrl")
+            print("🎫 [Token] Cached livekitUrl: \(livekitUrl)")
+        }
+
         if let t = response.token { return t }
         if let t = response.accessToken { return t }
         if let t = response.data?.token { return t }
@@ -203,14 +209,5 @@ final class RTCTokenService: RTCTokenProtocol {
         if let t = response.result?.accessToken { return t }
 
         throw TokenError.missingToken
-    }
-
-    private func stableIdentity() -> String {
-        if let stored = UserDefaults.standard.userIdentity {
-            return stored
-        }
-        let newIdentity = "ios-\(UUID().uuidString)"
-        UserDefaults.standard.userIdentity = newIdentity
-        return newIdentity
     }
 }

@@ -35,15 +35,21 @@ protocol UserInfoProtocol {
 
 /// 등록 프로토콜
 protocol RegistrationProtocol {
-    /// 보호자 등록
+    /// 보호자 등록 (기존 - 호환성 유지)
     func registerGuardian(wardEmail: String, wardPhoneNumber: String) async throws -> GuardianRegistrationResponse
+
+    /// 보호자 등록 (확장 - 어르신 상세 정보 포함)
+    func registerGuardian(
+        wardEmail: String,
+        wardPhoneNumber: String,
+        wardBasicInfo: WardBasicInfo?,
+        aiCareInfo: AICarInfo?,
+        callSchedule: AICallSchedule?
+    ) async throws -> GuardianRegistrationResponse
 }
 
 /// RTC 토큰 프로토콜
 protocol RTCTokenProtocol {
-    /// 익명 API 토큰 발급 (Legacy)
-    func fetchApiToken() async throws -> String
-
     /// LiveKit 접속용 토큰 발급
     func fetchLiveKitToken(roomName: String) async throws -> String
 }

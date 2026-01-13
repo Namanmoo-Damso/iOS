@@ -66,8 +66,8 @@ final class AppState: ObservableObject {
             await handleAuthError(error)
         } catch {
             debugLog("Unexpected error during auth check: \(error)")
-            // 네트워크 오류 등은 일단 로그인 상태로 간주 (오프라인 지원)
-            isAuthenticated = true
+            // 네트워크 오류 시 인증 실패로 처리 (유효하지 않은 상태로 진입 방지)
+            isAuthenticated = false
         }
 
         isLoading = false
@@ -78,6 +78,14 @@ final class AppState: ObservableObject {
         currentUser = user
         isAuthenticated = true
         debugLog("User logged in: \(user.nickname ?? "")")
+    }
+
+    /// 현재 사용자 정보 새로고침
+    func refreshCurrentUser() async throws {
+        debugLog("Refreshing current user info...")
+        let userInfo = try await authService.getMe()
+        currentUser = userInfo
+        debugLog("User info refreshed: \(userInfo.nickname ?? "")")
     }
 
     /// 로그아웃

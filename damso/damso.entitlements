@@ -4,5 +4,14 @@
 <dict>
 	<key>aps-environment</key>
 	<string>development</string>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:sodam.store</string>
+		<string>applinks:1.sodam.store</string>
+		<string>applinks:2.sodam.store</string>
+		<string>applinks:3.sodam.store</string>
+		<string>applinks:4.sodam.store</string>
+		<string>applinks:5.sodam.store</string>
+	</array>
 </dict>
 </plist>

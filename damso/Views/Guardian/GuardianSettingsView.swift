@@ -17,6 +17,7 @@ struct GuardianSettingsView: View {
     @State private var showUnlinkAlert = false
     @State private var isWithdrawing = false
     @State private var withdrawError: String?
+    @State private var showScheduleSheet = false
 
     var body: some View {
         NavigationStack {
@@ -31,8 +32,9 @@ struct GuardianSettingsView: View {
                 accountSection
             }
             .navigationTitle("설정")
+            .tint(.damsoGreen)
             .sheet(isPresented: $showAddWard) {
-                AddWardView()
+                AddWardDetailedView()
                     .environmentObject(appState)
             }
         }
@@ -85,35 +87,40 @@ struct GuardianSettingsView: View {
         } message: {
             Text("정말 어르신과의 연결을 해제하시겠습니까?")
         }
+        .sheet(isPresented: $showScheduleSheet) {
+            ScheduleManagementView()
+        }
     }
 
     // MARK: - 내 어르신 정보 섹션
 
     private var wardInfoSection: some View {
         Section("내 어르신 정보") {
-            if let wardInfo = appState.currentUser?.guardianInfo {
-                // 연결된 어르신이 있는 경우
-                if let linkedWard = wardInfo.linkedWard {
+            if let guardianInfo = appState.currentUser?.guardianInfo {
+                // 등록된 어르신 목록
+                ForEach(guardianInfo.wards) { ward in
                     WardInfoCard(
-                        nickname: linkedWard.nickname,
-                        email: wardInfo.wardEmail,
-                        phoneNumber: wardInfo.wardPhoneNumber,
-                        isLinked: true,
+                        nickname: ward.wardNickname,
+                        email: ward.wardEmail,
+                        phoneNumber: ward.wardPhoneNumber,
+                        isLinked: ward.isLinked,
                         onUnlink: {
                             showUnlinkAlert = true
                         }
                     )
-                } else {
-                    // 등록은 했지만 아직 연결되지 않은 경우
-                    WardInfoCard(
-                        nickname: nil,
-                        email: wardInfo.wardEmail,
-                        phoneNumber: wardInfo.wardPhoneNumber,
-                        isLinked: false,
-                        onUnlink: {
-                            showUnlinkAlert = true
-                        }
-                    )
+                }
+
+                // 어르신 추가 버튼
+                Button {
+                    showAddWard = true
+                } label: {
+                    HStack {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundColor(.damsoGreen)
+
+                        Text("어르신 추가하기")
+                            .foregroundColor(.damsoGreen)
+                    }
                 }
             } else {
                 // 어르신 등록 안 됨
@@ -122,10 +129,10 @@ struct GuardianSettingsView: View {
                 } label: {
                     HStack {
                         Image(systemName: "plus.circle.fill")
-                            .foregroundColor(.blue)
+                            .foregroundColor(.damsoGreen)
 
                         Text("어르신 추가하기")
-                            .foregroundColor(.blue)
+                            .foregroundColor(.damsoGreen)
                     }
                 }
             }
@@ -136,6 +143,20 @@ struct GuardianSettingsView: View {
 
     private var settingsSection: some View {
         Section {
+            // AI 안부 전화 스케줄 관리
+            Button {
+                showScheduleSheet = true
+            } label: {
+                HStack {
+                    Label("AI 안부 전화 스케줄", systemImage: "clock.badge")
+                        .foregroundColor(.primary)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+
             NavigationLink {
                 NotificationSettingsView()
             } label: {
@@ -209,10 +230,10 @@ struct WardInfoCard: View {
 
                 if isLinked {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
+                        .foregroundColor(.damsoGreen)
                 } else {
                     Image(systemName: "clock.fill")
-                        .foregroundColor(.orange)
+                        .foregroundColor(.damsoWarning)
                 }
             }
 

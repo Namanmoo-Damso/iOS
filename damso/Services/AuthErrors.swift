@@ -43,6 +43,27 @@ enum AuthError: LocalizedError {
     }
 }
 
+/// 스케줄 관련 에러
+enum ScheduleError: LocalizedError {
+    case wardNotFound
+    case slotCapacityExceeded(message: String)
+    case invalidTime
+    case invalidWeekdays
+    
+    var errorDescription: String? {
+        switch self {
+        case .wardNotFound:
+            return "어르신 정보를 찾을 수 없습니다."
+        case .slotCapacityExceeded(let message):
+            return message
+        case .invalidTime:
+            return "유효하지 않은 시간입니다."
+        case .invalidWeekdays:
+            return "유효하지 않은 요일입니다."
+        }
+    }
+}
+
 /// Legacy 토큰 에러 (호환성 유지)
 enum TokenError: LocalizedError {
     case missingAuthToken
@@ -50,6 +71,8 @@ enum TokenError: LocalizedError {
     case httpStatus(code: Int, body: String)
     case missingToken
     case networkError(String)
+    case serverAtCapacity       // 503: 서버 용량 초과
+    case callAlreadyActive      // 409: 이미 통화 중
 
     var errorDescription: String? {
         switch self {
@@ -66,6 +89,22 @@ enum TokenError: LocalizedError {
             return "Token is missing in API response."
         case let .networkError(msg):
             return "Network Error: \(msg)"
+        case .serverAtCapacity:
+            return "현재 서버가 혼잡합니다. 잠시 후 다시 시도해주세요."
+        case .callAlreadyActive:
+            return "이미 진행 중인 통화가 있습니다."
+        }
+    }
+    
+    /// 재시도 가능한 에러인지 확인
+    var isRetryable: Bool {
+        switch self {
+        case .serverAtCapacity:
+            return true
+        case .networkError:
+            return true
+        default:
+            return false
         }
     }
 }

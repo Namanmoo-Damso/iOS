@@ -4,7 +4,11 @@ struct KakaoLoginView: View {
     @ObservedObject var kakaoAuth = KakaoAuthService.shared
     let onLoginSuccess: (KakaoLoginResult) -> Void
 
+    /// Universal Link에서 진입 시 자동으로 카카오 로그인 트리거
+    var autoTriggerLogin: Bool = false
+
     @State private var hasCalledLoginSuccess = false
+    @State private var hasTriggeredAutoLogin = false
 
     var body: some View {
         VStack(spacing: 32) {
@@ -35,32 +39,8 @@ struct KakaoLoginView: View {
                 } else {
                     // Kakao login button
                     Button(action: {
-                        // 중복 호출 방지
-                        guard !hasCalledLoginSuccess else {
-                            print("[KakaoLoginView] 🚫 이미 로그인 처리 중 - 중복 호출 무시")
-                            return
-                        }
-
                         print("[KakaoLoginView] 🔵 로그인 버튼 클릭")
-                        Task {
-                            do {
-                                print("[KakaoLoginView] 🔵 kakaoAuth.login() 호출 시작")
-                                let result = try await kakaoAuth.login()
-                                print("[KakaoLoginView] ✅ 카카오 로그인 성공: \(result.userInfo.nickname ?? "unknown")")
-
-                                // 중복 호출 방지
-                                guard !hasCalledLoginSuccess else {
-                                    print("[KakaoLoginView] 🚫 이미 onLoginSuccess 호출됨 - 스킵")
-                                    return
-                                }
-                                hasCalledLoginSuccess = true
-                                print("[KakaoLoginView] 🔵 onLoginSuccess 콜백 호출")
-                                onLoginSuccess(result)
-                            } catch {
-                                print("[KakaoLoginView] ❌ 카카오 로그인 실패: \(error)")
-                                // 에러는 kakaoAuth.errorMessage에 이미 저장됨
-                            }
-                        }
+                        triggerKakaoLogin()
                     }) {
                         HStack(spacing: 12) {
                             Image(systemName: "message.fill")
@@ -90,6 +70,40 @@ struct KakaoLoginView: View {
                 .frame(height: 60)
         }
         .background(Color(.systemGroupedBackground))
+        .onAppear {
+            // Universal Link로 진입 시 자동 로그인 트리거
+            if autoTriggerLogin && !hasTriggeredAutoLogin && !kakaoAuth.isLoading {
+                hasTriggeredAutoLogin = true
+                print("[KakaoLoginView] 🔗 Universal Link - 자동 로그인 트리거")
+                triggerKakaoLogin()
+            }
+        }
+    }
+
+    /// 카카오 로그인 실행
+    private func triggerKakaoLogin() {
+        guard !hasCalledLoginSuccess else {
+            print("[KakaoLoginView] 🚫 이미 로그인 처리 중 - 중복 호출 무시")
+            return
+        }
+
+        Task {
+            do {
+                print("[KakaoLoginView] 🔵 kakaoAuth.login() 호출 시작")
+                let result = try await kakaoAuth.login()
+                print("[KakaoLoginView] ✅ 카카오 로그인 성공: \(result.userInfo.nickname ?? "unknown")")
+
+                guard !hasCalledLoginSuccess else {
+                    print("[KakaoLoginView] 🚫 이미 onLoginSuccess 호출됨 - 스킵")
+                    return
+                }
+                hasCalledLoginSuccess = true
+                print("[KakaoLoginView] 🔵 onLoginSuccess 콜백 호출")
+                onLoginSuccess(result)
+            } catch {
+                print("[KakaoLoginView] ❌ 카카오 로그인 실패: \(error)")
+            }
+        }
     }
 }
 

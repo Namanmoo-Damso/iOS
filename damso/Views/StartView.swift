@@ -8,7 +8,8 @@ struct StartView: View {
         ("김상연", "1.sodam.store"),
         ("문성수", "4.sodam.store"),
         ("배재완", "5.sodam.store"),
-        ("임익화", "2.sodam.store")
+        ("임익화", "2.sodam.store"),
+        ("식스맨", "sodam.store")
     ]
     
     var body: some View {
@@ -22,6 +23,7 @@ struct StartView: View {
                 ForEach(users, id: \.1) { name, domain in
                     Button(action: {
                         AppConfig.serverDomain = domain
+                        AppConfig.selectedDeveloperName = name
                         isServerSelected = true
                     }) {
                         Text(name)
@@ -29,7 +31,7 @@ struct StartView: View {
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.blue)
+                            .background(name == "식스맨" ? Color.orange : Color.blue)
                             .cornerRadius(12)
                     }
                     .padding(.horizontal, 40)

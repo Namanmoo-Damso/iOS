@@ -49,6 +49,7 @@ enum Strings {
         static let selectUserTypeMessage = "시작하기 전에, 본인을 알려주세요"
         static let loginWithKakao = "카카오로 시작하기"
         static let loginFailed = "로그인에 실패했습니다. 다시 시도해주세요."
+        static let loginFailedTitle = "로그인 실패"
         static let sessionExpiredTitle = "세션 만료"
         static let sessionExpiredMessage = "로그인 세션이 만료되었습니다.\n다시 로그인해 주세요."
         static let missingToken = "인증 토큰이 없습니다."

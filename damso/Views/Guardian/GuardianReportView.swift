@@ -31,7 +31,7 @@ struct GuardianReportView: View {
                 }
                 .padding()
             }
-            .background(Color(.systemGroupedBackground))
+            .background(Color.creamRice)
             .navigationTitle("분석 보고서")
             .refreshable {
                 await viewModel.fetchReport()
@@ -68,7 +68,7 @@ struct EmotionTrendChart: View {
                         x: .value("날짜", item.date, unit: .day),
                         y: .value("감정", item.score)
                     )
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(Color.damsoGreen)
                     .lineStyle(StrokeStyle(lineWidth: 2))
 
                     PointMark(
@@ -108,9 +108,9 @@ struct EmotionTrendChart: View {
 
     private func moodColor(_ mood: EmotionDataPoint.EmotionMood) -> Color {
         switch mood {
-        case .positive: return .green
-        case .neutral: return .orange
-        case .negative: return .red
+        case .positive: return .damsoSafe
+        case .neutral: return .damsoWarning
+        case .negative: return .damsoDanger
         }
     }
 
@@ -135,7 +135,7 @@ struct HealthKeywordsCard: View {
                 // 통증 언급
                 HStack {
                     Image(systemName: "bandage")
-                        .foregroundColor(.red)
+                        .foregroundColor(.damsoDanger)
                         .frame(width: 24)
 
                     Text("통증 언급")
@@ -145,11 +145,11 @@ struct HealthKeywordsCard: View {
 
                     Text("\(keywords.pain.count)회")
                         .fontWeight(.semibold)
-                        .foregroundColor(keywords.pain.count > 0 ? .red : .green)
+                        .foregroundColor(keywords.pain.count > 0 ? .damsoDanger : .damsoSafe)
 
                     if keywords.pain.trend == "increasing" {
                         Image(systemName: "arrow.up")
-                            .foregroundColor(.red)
+                            .foregroundColor(.damsoDanger)
                             .font(.caption)
                     }
                 }
@@ -211,8 +211,8 @@ struct HealthKeywordsCard: View {
 
     private func statusColor(_ status: String) -> Color {
         switch status {
-        case "good", "regular": return .green
-        case "poor", "irregular": return .red
+        case "good", "regular": return .damsoSafe
+        case "poor", "irregular": return .damsoDanger
         default: return .secondary
         }
     }

@@ -30,9 +30,19 @@ final class AuthService: AuthServiceProtocol {
 
     /// 카카오 로그인 + 서버 JWT 발급
     func loginWithKakao(kakaoAccessToken: String, kakaoUserInfo: KakaoUserInfo? = nil, userType: UserType? = nil) async throws -> AuthResponse {
+        Log.auth.i("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        Log.auth.i("🔐 loginWithKakao 시작")
+        Log.auth.i("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        Log.auth.i("userType: \(userType?.rawValue ?? "nil")")
+        Log.auth.i("kakaoAccessToken: \(String(kakaoAccessToken.prefix(20)))...")
+        Log.auth.i("nickname: \(kakaoUserInfo?.nickname ?? "nil")")
+        Log.auth.i("email: \(kakaoUserInfo?.email ?? "nil")")
+
         guard let url = URL(string: "\(AppConfig.apiBaseURL)/v1/auth/kakao") else {
+            Log.auth.e("❌ Invalid auth URL")
             throw AuthError.networkError("Invalid auth URL")
         }
+        Log.auth.i("📡 요청 URL: \(url.absoluteString)")
 
         var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: Numbers.Timeout.networkRequest)
         request.httpMethod = "POST"
@@ -61,33 +71,46 @@ final class AuthService: AuthServiceProtocol {
             body["userType"] = userType.rawValue
         }
 
+        Log.auth.i("📤 요청 body: \(body.filter { $0.key != "kakaoAccessToken" })")
+
         do {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
         } catch {
+            Log.auth.e("❌ Request body encoding failed: \(error)")
             throw AuthError.networkError("Request body encoding failed")
         }
 
         let data: Data
         let response: URLResponse
 
+        Log.auth.i("📡 서버 요청 시작...")
         do {
             (data, response) = try await URLSession.shared.data(for: request)
+            Log.auth.i("📡 서버 응답 수신 완료")
         } catch {
+            Log.auth.e("❌ 네트워크 요청 실패: \(error)")
+            Log.auth.e("❌ 에러 타입: \(type(of: error))")
             throw AuthError.networkError(error.localizedDescription)
         }
 
         guard let httpResponse = response as? HTTPURLResponse else {
+            Log.auth.e("❌ 응답이 HTTPURLResponse가 아님")
             throw AuthError.invalidResponse
         }
 
+        Log.auth.i("📡 HTTP 상태 코드: \(httpResponse.statusCode)")
+
         guard (200..<300).contains(httpResponse.statusCode) else {
             let bodyText = String(data: data, encoding: .utf8) ?? ""
+            Log.auth.e("❌ HTTP 에러 응답")
+            Log.auth.e("❌ 상태 코드: \(httpResponse.statusCode)")
+            Log.auth.e("❌ 응답 본문: \(bodyText)")
             throw AuthError.httpStatus(code: httpResponse.statusCode, body: bodyText)
         }
 
         // 디버그 로그
         if let rawJSON = String(data: data, encoding: .utf8) {
-            Log.auth.d("서버 응답 (raw): \(rawJSON)")
+            Log.auth.d("✅ 서버 응답 (raw): \(rawJSON)")
         }
 
         do {
@@ -99,6 +122,14 @@ final class AuthService: AuthServiceProtocol {
                let refreshToken = authResponse.refreshToken {
                 TokenManager.shared.saveTokens(access: accessToken, refresh: refreshToken)
                 Log.auth.i("Login successful, tokens saved (isNewUser: \(authResponse.isNewUserFlag))")
+
+                // 캐시된 푸시 토큰으로 디바이스 재등록
+                Task {
+                    try? await PushNotificationService.shared.registerDeviceTokens(
+                        apnsToken: UserDefaults.standard.cachedApnsToken,
+                        voipToken: UserDefaults.standard.cachedVoipToken
+                    )
+                }
             } else {
                 Log.auth.w("Login successful but missing tokens in response")
             }
@@ -209,10 +240,6 @@ final class AuthService: AuthServiceProtocol {
 
     // MARK: - AuthServiceProtocol Conformance (Delegation)
 
-    func fetchApiToken() async throws -> String {
-        try await RTCTokenService.shared.fetchApiToken()
-    }
-
     func fetchLiveKitToken(roomName: String) async throws -> String {
         try await RTCTokenService.shared.fetchLiveKitToken(roomName: roomName)
     }
@@ -225,8 +252,246 @@ final class AuthService: AuthServiceProtocol {
         try await RegistrationService.shared.registerGuardian(wardEmail: wardEmail, wardPhoneNumber: wardPhoneNumber)
     }
 
+    func registerGuardian(
+        wardEmail: String,
+        wardPhoneNumber: String,
+        wardBasicInfo: WardBasicInfo?,
+        aiCareInfo: AICarInfo?,
+        callSchedule: AICallSchedule?
+    ) async throws -> GuardianRegistrationResponse {
+        try await RegistrationService.shared.registerGuardian(
+            wardEmail: wardEmail,
+            wardPhoneNumber: wardPhoneNumber,
+            wardBasicInfo: wardBasicInfo,
+            aiCareInfo: aiCareInfo,
+            callSchedule: callSchedule
+        )
+    }
+
     func deleteUser() async throws {
         try await UserService.shared.deleteUser()
+    }
+
+    // MARK: - 개발용 로그인 (카카오 로그인 없이)
+
+    /// 개발용 로그인 API - 이미 등록된 보호자면 토큰만 발급
+    /// - Returns: AuthResponse (isNewUser로 등록 필요 여부 확인)
+    /// - Note: 개발 환경에서만 동작 (production에서는 403)
+    func devLogin(developerName: String) async throws -> AuthResponse {
+        let wardEmail = AppConfig.selectedDevWardEmail
+        Log.auth.i("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        Log.auth.i("🔧 devLogin 시작 (개발용)")
+        Log.auth.i("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        Log.auth.i("developerName: \(developerName), wardEmail: \(wardEmail)")
+
+        guard !wardEmail.isEmpty else {
+            Log.auth.e("❌ 선택된 개발자의 wardEmail이 없음")
+            throw AuthError.networkError("개발자를 먼저 선택해주세요")
+        }
+
+        guard let url = URL(string: "\(AppConfig.apiBaseURL)/v1/auth/dev/guardian") else {
+            throw AuthError.networkError("Invalid dev login URL")
+        }
+
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: Numbers.Timeout.networkRequest)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let body: [String: Any] = [
+            "wardEmail": wardEmail
+        ]
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        } catch {
+            Log.auth.e("❌ Request body encoding failed: \(error)")
+            throw AuthError.networkError("Request body encoding failed")
+        }
+
+        let data: Data
+        let response: URLResponse
+
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch {
+            Log.auth.e("❌ 네트워크 요청 실패: \(error)")
+            throw AuthError.networkError(error.localizedDescription)
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AuthError.invalidResponse
+        }
+
+        Log.auth.i("📡 응답 상태 코드: \(httpResponse.statusCode)")
+
+        if httpResponse.statusCode == 403 {
+            Log.auth.e("❌ 개발용 API는 production에서 사용 불가")
+            throw AuthError.httpStatus(code: 403, body: "개발용 API는 production 환경에서 사용할 수 없습니다.")
+        }
+
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            let bodyText = String(data: data, encoding: .utf8) ?? ""
+            Log.auth.e("❌ HTTP 에러: \(httpResponse.statusCode), body: \(bodyText)")
+            throw AuthError.httpStatus(code: httpResponse.statusCode, body: bodyText)
+        }
+
+        // 응답 파싱
+        let authResponse: AuthResponse
+        do {
+            authResponse = try JSONDecoder.apiDecoder.decode(AuthResponse.self, from: data)
+            logAuthResponse(authResponse)
+        } catch {
+            logDecodingError(error)
+            throw AuthError.decodingError(error.localizedDescription)
+        }
+
+        // 토큰 저장 (이미 등록된 사용자인 경우)
+        if !authResponse.isNewUserFlag,
+           let accessToken = authResponse.accessToken,
+           let refreshToken = authResponse.refreshToken {
+            TokenManager.shared.saveTokens(access: accessToken, refresh: refreshToken)
+            Log.auth.i("✅ 개발용 로그인 토큰 저장 완료")
+
+            // 캐시된 푸시 토큰으로 디바이스 재등록
+            Task {
+                try? await PushNotificationService.shared.registerDeviceTokens(
+                    apnsToken: UserDefaults.standard.cachedApnsToken,
+                    voipToken: UserDefaults.standard.cachedVoipToken
+                )
+            }
+        }
+
+        return authResponse
+    }
+
+    // MARK: - 개발용 보호자 등록 (카카오 로그인 없이)
+
+    /// 개발용 보호자 등록 API - 카카오 로그인 없이 토큰 발급
+    /// - Note: 개발 환경에서만 동작 (production에서는 403)
+    func registerDevGuardian(
+        wardEmail: String,
+        wardPhoneNumber: String,
+        wardBasicInfo: WardBasicInfo?,
+        aiCareInfo: AICarInfo?,
+        callSchedule: AICallSchedule?,
+        guardianNickname: String? = nil,
+        guardianEmail: String? = nil
+    ) async throws -> AuthResponse {
+        Log.auth.i("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        Log.auth.i("🔧 registerDevGuardian 시작 (개발용)")
+        Log.auth.i("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+        guard let url = URL(string: "\(AppConfig.apiBaseURL)/v1/auth/dev/guardian") else {
+            throw AuthError.networkError("Invalid dev guardian URL")
+        }
+
+        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: Numbers.Timeout.networkRequest)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        var body: [String: Any] = [
+            "wardEmail": wardEmail,
+            "wardPhoneNumber": wardPhoneNumber
+        ]
+
+        // wardBasicInfo
+        if let basicInfo = wardBasicInfo {
+            body["wardBasicInfo"] = [
+                "name": basicInfo.name,
+                "relation": basicInfo.relation.rawValue,
+                "birthDate": basicInfo.birthDate,
+                "gender": basicInfo.gender.rawValue,
+                "address": basicInfo.address
+            ]
+        }
+
+        // aiCareInfo
+        if let careInfo = aiCareInfo {
+            body["aiCareInfo"] = [
+                "medicalConditions": careInfo.medicalConditions,
+                "medications": careInfo.medications
+            ]
+        }
+
+        // callSchedule
+        if let schedule = callSchedule {
+            let items = schedule.items.map { item -> [String: Any] in
+                [
+                    "time": item.timeString,
+                    "weekdays": item.weekdays.map { $0.rawValue },
+                    "isEnabled": item.isEnabled
+                ]
+            }
+            body["callSchedule"] = [
+                "isEnabled": schedule.isEnabled,
+                "items": items
+            ]
+        }
+
+        // 보호자 정보 (선택)
+        if let nickname = guardianNickname {
+            body["nickname"] = nickname
+        }
+        if let email = guardianEmail {
+            body["email"] = email
+        }
+
+        Log.auth.i("📤 요청 body: \(body)")
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        } catch {
+            Log.auth.e("❌ Request body encoding failed: \(error)")
+            throw AuthError.networkError("Request body encoding failed")
+        }
+
+        let data: Data
+        let response: URLResponse
+
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch {
+            Log.auth.e("❌ 네트워크 요청 실패: \(error)")
+            throw AuthError.networkError(error.localizedDescription)
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AuthError.invalidResponse
+        }
+
+        Log.auth.i("📡 응답 상태 코드: \(httpResponse.statusCode)")
+
+        if httpResponse.statusCode == 403 {
+            Log.auth.e("❌ 개발용 API는 production에서 사용 불가")
+            throw AuthError.httpStatus(code: 403, body: "개발용 API는 production 환경에서 사용할 수 없습니다.")
+        }
+
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            let bodyText = String(data: data, encoding: .utf8) ?? ""
+            Log.auth.e("❌ HTTP 에러: \(httpResponse.statusCode), body: \(bodyText)")
+            throw AuthError.httpStatus(code: httpResponse.statusCode, body: bodyText)
+        }
+
+        // 응답 파싱
+        let authResponse: AuthResponse
+        do {
+            authResponse = try JSONDecoder.apiDecoder.decode(AuthResponse.self, from: data)
+            logAuthResponse(authResponse)
+        } catch {
+            logDecodingError(error)
+            throw AuthError.decodingError(error.localizedDescription)
+        }
+
+        // 토큰 저장
+        if let accessToken = authResponse.accessToken,
+           let refreshToken = authResponse.refreshToken {
+            TokenManager.shared.saveTokens(access: accessToken, refresh: refreshToken)
+            Log.auth.i("✅ 개발용 토큰 저장 완료")
+        }
+
+        return authResponse
     }
 
     // MARK: - Private Helpers

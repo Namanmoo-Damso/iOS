@@ -7,47 +7,54 @@ struct CallTopBar: View {
     let callDuration: TimeInterval
     let isConnected: Bool
     let remoteConnectionQuality: ConnectionQuality
+    var onVideoQualityTap: (() -> Void)? = nil
+
+    // 기준 화면 너비 (iPad mini 6)
+    private let baseWidth: CGFloat = 768
+
+    /// 상대값 계산
+    private func relative(_ value: CGFloat, screenWidth: CGFloat) -> CGFloat {
+        value * (screenWidth / baseWidth)
+    }
+
+    /// 폰트 크기 상대값 (제한 없이 화면에 비례)
+    private func relativeFontSize(_ baseSize: CGFloat, screenWidth: CGFloat) -> CGFloat {
+        baseSize * (screenWidth / baseWidth)
+    }
 
     var body: some View {
-        HStack {
-            Spacer()
+        GeometryReader { geometry in
+            let screenWidth = geometry.size.width
 
-            // Center - Name and status
-            VStack(spacing: 4) {
+            VStack(spacing: relative(6, screenWidth: screenWidth)) {
+                // 이름 (크기 증가: 20 → 28)
                 Text(callerName)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(.white)
+                    .font(.system(size: relativeFontSize(28, screenWidth: screenWidth), weight: .bold))
+                    .foregroundColor(.black)
 
-                HStack(spacing: 8) {
-                    // Connection status indicator
+                HStack(spacing: relative(10, screenWidth: screenWidth)) {
+                    // 연결 상태 표시 (빨간 점 = 녹화/통화 중, 크기 증가)
                     Circle()
-                        .fill(isConnected ? Color.green : Color.orange)
-                        .frame(width: 8, height: 8)
+                        .fill(Color.red)
+                        .frame(width: relative(12, screenWidth: screenWidth), height: relative(12, screenWidth: screenWidth))
 
-                    // Duration timer
+                    // 통화 시간 (크기 증가: 14 → 20)
                     Text(formatDuration(callDuration))
-                        .font(.system(size: 14))
-                        .foregroundColor(.white.opacity(0.8))
+                        .font(.system(size: relativeFontSize(20, screenWidth: screenWidth), weight: .medium))
+                        .foregroundColor(.black.opacity(0.8))
 
-                    // Remote network quality indicator
-                    RemoteNetworkIndicator(quality: remoteConnectionQuality)
+                    // 네트워크 품질 표시
+                    if isConnected {
+                        RemoteNetworkIndicator(quality: remoteConnectionQuality, screenWidth: screenWidth)
+                    }
                 }
             }
-
-            Spacer()
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, relative(16, screenWidth: screenWidth))
+            .padding(.top, relative(16, screenWidth: screenWidth))
+            .padding(.bottom, relative(12, screenWidth: screenWidth))
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 12)
-        .background(
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color.black.opacity(0.7),
-                    Color.black.opacity(0.0)
-                ]),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
+        .frame(height: UIScreen.main.bounds.width * 0.12)  // 화면 너비의 12%
     }
 
     private func formatDuration(_ duration: TimeInterval) -> String {
@@ -60,21 +67,30 @@ struct CallTopBar: View {
 // MARK: - Remote Network Indicator
 struct RemoteNetworkIndicator: View {
     let quality: ConnectionQuality
+    var screenWidth: CGFloat = 768  // 기본값: iPad mini 6
+
+    // 기준 화면 너비
+    private let baseWidth: CGFloat = 768
+
+    /// 상대값 계산
+    private func relative(_ value: CGFloat) -> CGFloat {
+        value * (screenWidth / baseWidth)
+    }
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: relative(3)) {
             ForEach(0..<4) { index in
-                RoundedRectangle(cornerRadius: 1)
+                RoundedRectangle(cornerRadius: relative(2))
                     .fill(barColor(for: index))
-                    .frame(width: 3, height: barHeight(for: index))
+                    .frame(width: relative(5), height: barHeight(for: index))
             }
         }
-        .frame(height: 14)
+        .frame(height: relative(20))
     }
 
     private func barHeight(for index: Int) -> CGFloat {
-        let heights: [CGFloat] = [4, 7, 10, 14]
-        return heights[index]
+        let heights: [CGFloat] = [6, 10, 14, 20]
+        return relative(heights[index])
     }
 
     private func barColor(for index: Int) -> Color {

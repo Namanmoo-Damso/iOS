@@ -15,10 +15,10 @@ extension UserDefaults {
         static let selectedServerDomain = "selectedServerDomain"
         static let pendingLoginUserType = "pendingLoginUserType"
         static let kakaoUserId = "kakao_user_id"
-        static let userIdentity = "user_identity"
         static let cachedApnsToken = "cached_apns_token"
         static let cachedVoipToken = "cached_voip_token"
         static let legacyAuthToken = "authToken"
+        static let permissionOnboardingCompleted = "permission_onboarding_completed"
     }
 
     // MARK: - Typed Accessors
@@ -26,11 +26,6 @@ extension UserDefaults {
     var selectedServerDomain: String? {
         get { string(forKey: Keys.selectedServerDomain) }
         set { set(newValue, forKey: Keys.selectedServerDomain) }
-    }
-
-    var userIdentity: String? {
-        get { string(forKey: Keys.userIdentity) }
-        set { set(newValue, forKey: Keys.userIdentity) }
     }
 
     var cachedApnsToken: String? {
@@ -46,6 +41,11 @@ extension UserDefaults {
     var legacyAuthToken: String? {
         get { string(forKey: Keys.legacyAuthToken) }
         set { set(newValue, forKey: Keys.legacyAuthToken) }
+    }
+
+    var permissionOnboardingCompleted: Bool {
+        get { bool(forKey: Keys.permissionOnboardingCompleted) }
+        set { set(newValue, forKey: Keys.permissionOnboardingCompleted) }
     }
 
     // MARK: - Helper Methods

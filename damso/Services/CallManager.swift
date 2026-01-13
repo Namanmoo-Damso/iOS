@@ -120,20 +120,12 @@ final class CallManager: NSObject, CallManagerProtocol {
         update.hasVideo = hasVideo
 
         provider.reportNewIncomingCall(with: uuid, update: update) { error in
-            Task { @MainActor in
-                if error == nil {
-                    CallStateStore.shared.setIncoming(
-                        uuid: uuid,
-                        callId: callId,
-                        handle: handle,
-                        hasVideo: hasVideo,
-                        roomName: roomName
-                    )
-                    self.debugLog("CallKit incoming call reported ok uuid=\(uuid.uuidString)")
-                }
-            }
             if let error = error {
                 self.debugLog("CallKit report failed: \(error)")
+            } else {
+                // CallKit UI가 표시되므로 custom banner는 표시하지 않음
+                // (사용자가 CallKit에서 수락하면 CXAnswerCallAction에서 CallStateStore.setAnswered 호출)
+                self.debugLog("CallKit incoming call reported ok uuid=\(uuid.uuidString)")
             }
             completion?(error)
         }
@@ -159,6 +151,16 @@ final class CallManager: NSObject, CallManagerProtocol {
                 self.debugLog("end call failed: \(error)")
             }
         }
+    }
+
+    /// CallKit에 통화 종료 리포트 (UI 숨기기용)
+    /// - Parameters:
+    ///   - uuid: 통화 UUID
+    ///   - reason: 종료 이유 (.answeredElsewhere = 다른 곳에서 처리됨)
+    func reportCallEnded(uuid: UUID, reason: CXCallEndedReason) {
+        debugLog("reportCallEnded uuid=\(uuid.uuidString) reason=\(reason.rawValue)")
+        provider.reportCall(with: uuid, endedAt: Date(), reason: reason)
+        cleanupCall(uuid: uuid)
     }
 
     private func cleanupCall(uuid: UUID) {

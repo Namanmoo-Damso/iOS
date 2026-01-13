@@ -12,6 +12,8 @@
 	<string>안전을 위해 위치 정보가 필요합니다.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>안전을 위해 백그라운드에서도 위치를 확인합니다.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>낙상 감지를 위해 움직임 센서를 사용합니다.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

@@ -56,9 +56,29 @@ final class UserService: UserInfoProtocol {
             throw AuthError.httpStatus(code: httpResponse.statusCode, body: bodyText)
         }
 
+        // 디버그: Raw JSON 출력
+        #if DEBUG
+        if let jsonString = String(data: data, encoding: .utf8) {
+            Log.auth.d("Raw /users/me response: \(jsonString)")
+        }
+        #endif
+
         do {
             let userResponse = try JSONDecoder.apiDecoder.decode(UserMeResponse.self, from: data)
-            Log.auth.i("User info fetched: \(userResponse.nickname ?? "nil")")
+            Log.auth.i("User info fetched: \(userResponse.nickname ?? "nil"), userType: \(String(describing: userResponse.userType))")
+            // 보호자 정보 로깅
+            if let guardianInfo = userResponse.guardianInfo {
+                Log.auth.d("guardianInfo.id: \(guardianInfo.id)")
+                Log.auth.d("guardianInfo.wards count: \(guardianInfo.wards.count)")
+                for (index, ward) in guardianInfo.wards.enumerated() {
+                    Log.auth.d("  ward[\(index)]: email=\(ward.wardEmail), linked=\(ward.isLinked)")
+                }
+            } else {
+                Log.auth.d("guardianInfo: nil")
+            }
+            // 어르신 정보 로깅
+            Log.auth.d("wardInfo: \(String(describing: userResponse.wardInfo))")
+            Log.auth.d("linkedGuardian: \(String(describing: userResponse.wardInfo?.linkedGuardian))")
             return userResponse
         } catch {
             Log.auth.e("Decoding error: \(error)")

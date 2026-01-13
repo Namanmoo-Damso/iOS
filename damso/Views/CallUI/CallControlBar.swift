@@ -2,97 +2,124 @@ import SwiftUI
 
 struct CallControlBar: View {
     let isMicEnabled: Bool
-    let isCameraEnabled: Bool
     let isSpeakerEnabled: Bool
-    let isRemoteVideoVisible: Bool
-    let canSwitchCamera: Bool
+    var isCameraEnabled: Bool = false
+    var showCameraButton: Bool = true
 
     let onToggleMic: () -> Void
-    let onToggleCamera: () -> Void
     let onEndCall: () -> Void
-    let onFlipCamera: () -> Void
     let onToggleSpeaker: () -> Void
-    let onToggleRemoteVideo: () -> Void
+    var onToggleCamera: (() -> Void)? = nil
+
+    // 배경색 (완전 불투명 블랙)
+    private let backgroundColor = Color.black
 
     var body: some View {
-        VStack(spacing: 12) {
-            // Control buttons
-            HStack(spacing: 16) {
+        let screenWidth = UIScreen.main.bounds.width
+        // 버튼 크기
+        let buttonSize = screenWidth * 0.14
+        // 종료 버튼은 약간 더 크게
+        let endButtonSize = screenWidth * 0.154
+        // 버튼 간 간격
+        let buttonSpacing = screenWidth * 0.03
+        // 버튼 영역 패딩 (상하 동일하게)
+        let buttonPadding = screenWidth * 0.024
+
+        VStack(spacing: 0) {
+            // 컨트롤 버튼 영역
+            HStack(spacing: buttonSpacing) {
                 // Microphone button
-                CallControlButton(
+                LabeledCallButton(
                     icon: isMicEnabled ? "mic.fill" : "mic.slash.fill",
+                    label: "마이크",
                     isActive: isMicEnabled,
                     activeColor: .white.opacity(0.2),
-                    inactiveColor: .white.opacity(0.2),
                     iconColor: isMicEnabled ? .white : .red,
+                    size: buttonSize,
                     action: onToggleMic
                 )
 
-                // Camera button
-                CallControlButton(
-                    icon: isCameraEnabled ? "video.fill" : "video.slash.fill",
-                    isActive: isCameraEnabled,
-                    activeColor: Color.blue,
-                    inactiveColor: .white.opacity(0.2),
-                    iconColor: .white,
-                    action: onToggleCamera
-                )
-
-                // End call button
-                CallControlButton(
-                    icon: "phone.down.fill",
-                    isActive: true,
-                    activeColor: Color.red,
-                    inactiveColor: Color.red,
-                    iconColor: .white,
-                    size: 60,
-                    action: onEndCall
-                )
-
-                // Flip camera button
-                CallControlButton(
-                    icon: "arrow.triangle.2.circlepath.camera",
-                    isActive: true,
-                    activeColor: .white.opacity(0.2),
-                    inactiveColor: .white.opacity(0.15),
-                    iconColor: canSwitchCamera ? .white : .white.opacity(0.4),
-                    action: onFlipCamera
-                )
-                .disabled(!canSwitchCamera)
-
-                // Speaker button
-                CallControlButton(
+                // Speaker button (AI 음성)
+                LabeledCallButton(
                     icon: isSpeakerEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill",
+                    label: "AI 음성",
                     isActive: isSpeakerEnabled,
                     activeColor: .white.opacity(0.2),
-                    inactiveColor: .white.opacity(0.2),
                     iconColor: isSpeakerEnabled ? .white : .orange,
+                    size: buttonSize,
                     action: onToggleSpeaker
                 )
 
-                // Remote video toggle button
-                CallControlButton(
-                    icon: isRemoteVideoVisible ? "eye.fill" : "eye.slash.fill",
-                    isActive: isRemoteVideoVisible,
-                    activeColor: .white.opacity(0.2),
-                    inactiveColor: .white.opacity(0.2),
-                    iconColor: isRemoteVideoVisible ? .white : .orange,
-                    action: onToggleRemoteVideo
+                // End call button
+                LabeledCallButton(
+                    icon: "phone.down.fill",
+                    label: "종료",
+                    isActive: true,
+                    activeColor: Color.red,
+                    iconColor: .white,
+                    size: endButtonSize,
+                    action: onEndCall
                 )
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 14)
-            .background(
-                Capsule()
-                    .fill(Color.black.opacity(0.6))
-                    .background(
-                        Capsule()
-                            .fill(.ultraThinMaterial)
+
+                // Camera button
+                if let onToggleCamera = onToggleCamera {
+                    LabeledCallButton(
+                        icon: isCameraEnabled ? "video.fill" : "video.slash.fill",
+                        label: "카메라",
+                        isActive: isCameraEnabled,
+                        activeColor: .white.opacity(0.2),
+                        iconColor: isCameraEnabled ? .white : .yellow,
+                        size: buttonSize,
+                        action: onToggleCamera
                     )
-            )
+                }
+            }
+            .padding(.top, buttonPadding)
+            .padding(.bottom, buttonPadding)
+            .frame(maxWidth: .infinity)
+            .background(backgroundColor)
         }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 40)
+    }
+}
+
+
+/// 레이블이 있는 통화 컨트롤 버튼
+struct LabeledCallButton: View {
+    let icon: String
+    let label: String
+    let isActive: Bool
+    let activeColor: Color
+    let iconColor: Color
+    var size: CGFloat = 48
+    let action: () -> Void
+
+    // 레이블 크기는 버튼 크기에 비례
+    private var labelSize: CGFloat {
+        max(size * 0.22, 10)  // 최소 10pt
+    }
+
+    // 아이콘과 레이블 간격도 비례
+    private var spacing: CGFloat {
+        size * 0.12
+    }
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: spacing) {
+                Image(systemName: icon)
+                    .font(.system(size: size * 0.40, weight: .semibold))
+                    .foregroundColor(iconColor)
+                    .frame(width: size, height: size)
+                    .background(
+                        Circle()
+                            .fill(activeColor)
+                    )
+
+                Text(label)
+                    .font(.system(size: labelSize, weight: .medium))
+                    .foregroundColor(.white.opacity(0.8))
+            }
+        }
     }
 }
 
@@ -119,24 +146,3 @@ struct CallControlButton: View {
     }
 }
 
-#Preview {
-    ZStack {
-        Color.gray
-        VStack {
-            Spacer()
-            CallControlBar(
-                isMicEnabled: true,
-                isCameraEnabled: true,
-                isSpeakerEnabled: true,
-                isRemoteVideoVisible: true,
-                canSwitchCamera: true,
-                onToggleMic: {},
-                onToggleCamera: {},
-                onEndCall: {},
-                onFlipCamera: {},
-                onToggleSpeaker: {},
-                onToggleRemoteVideo: {}
-            )
-        }
-    }
-}

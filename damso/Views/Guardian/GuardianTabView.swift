@@ -37,6 +37,8 @@ struct GuardianTabView: View {
                 }
                 .tag(2)
         }
+        .tabViewStyle(.tabBarOnly)  // iPad에서도 하단 탭바 강제
+        .tint(.damsoGreen)
     }
 }
 

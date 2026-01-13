@@ -2,232 +2,321 @@
 //  GuardianRegistrationView.swift
 //  damso
 //
-//  Created by Claude Code on 2024-12-30.
+//  보호자가 어르신 정보를 등록하는 화면
 //
 
 import SwiftUI
 
-/// 보호자 회원가입 폼
+/// 보호자 어르신 등록 화면
 struct GuardianRegistrationView: View {
-    /// 앱 상태
     @EnvironmentObject var appState: AppState
 
-    /// 카카오에서 가져온 사용자 정보
     let kakaoUserInfo: KakaoUserInfo
-
-    /// 등록 완료 콜백 (wardEmail 전달)
-    let onRegistrationComplete: (String) -> Void
-
-    /// 뒤로가기 콜백
+    let onRegistrationComplete: (String, UserMeResponse) -> Void
     let onBack: (() -> Void)?
+    let useDummyData: Bool
+    let isAddingWard: Bool  // 기존 보호자가 어르신을 추가하는 모드
 
+    // MARK: - State
+
+    // 기본 정보
+    @State private var wardName = ""
+    @State private var selectedRelation: WardRelationType = .parent
     @State private var wardEmail = ""
-    @State private var wardPhoneNumber = ""
+    @State private var phoneNumber = ""
+    @State private var birthDate = ""
+    @State private var selectedGender: Gender = .male
+    @State private var address = ""
+
+    // AI 케어 정보
+    @State private var medicalConditions = ""
+    @State private var medications = ""
+
+    // AI 전화 스케줄
+    @State private var scheduleItems: [AICallScheduleItem] = [AICallScheduleItem()]
+    @State private var isScheduleEnabled = true
+    @State private var showScheduleSheet = false
+
+    // UI 상태
     @State private var isLoading = false
     @State private var errorMessage: String?
-    @State private var showSuccessAlert = false
-    @State private var isSharing = false
     @State private var registeredGuardianId: String?
     @State private var pendingUser: UserMeResponse?
 
     @FocusState private var focusedField: Field?
 
-    enum Field {
-        case wardEmail
-        case wardPhoneNumber
+    enum Field: Hashable {
+        case wardName, wardEmail, phoneNumber, birthDate, address
+        case medicalConditions, medications
     }
 
     init(
         kakaoUserInfo: KakaoUserInfo,
-        onRegistrationComplete: @escaping (String) -> Void,
-        onBack: (() -> Void)? = nil
+        onRegistrationComplete: @escaping (String, UserMeResponse) -> Void,
+        onBack: (() -> Void)? = nil,
+        useDummyData: Bool = false,
+        isAddingWard: Bool = false
     ) {
         self.kakaoUserInfo = kakaoUserInfo
         self.onRegistrationComplete = onRegistrationComplete
         self.onBack = onBack
+        self.useDummyData = useDummyData
+        self.isAddingWard = isAddingWard
     }
 
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 24) {
-                    // 헤더
-                    headerSection
-
-                    // 카카오 프로필 섹션
-                    kakaoProfileSection
-
-                    // 어르신 정보 입력 섹션
-                    wardInfoSection
-
-                    // 에러 메시지
-                    if let error = errorMessage {
-                        Text(error)
-                            .font(.caption)
-                            .foregroundColor(.red)
-                            .padding(.horizontal)
-                    }
-
-                    // 가입 버튼
-                    registerButton
-                }
-                .padding()
-            }
-            .background(Color(.systemGroupedBackground))
-            .navigationTitle("보호자 등록")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                if let onBack = onBack {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button(action: onBack) {
-                            Image(systemName: "chevron.left")
+        if isAddingWard {
+            // 부모 NavigationStack 사용 (중첩 방지)
+            mainContent
+                .navigationTitle("어르신 추가")
+                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarBackButtonHidden(false)
+        } else {
+            // 자체 NavigationView 사용 (최초 등록 플로우)
+            NavigationView {
+                mainContent
+                    .navigationTitle("어르신 등록")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        if let onBack = onBack {
+                            ToolbarItem(placement: .navigationBarLeading) {
+                                Button(action: onBack) {
+                                    Image(systemName: "chevron.left")
+                                }
+                            }
                         }
                     }
-                }
             }
-        }
-        .navigationViewStyle(.stack)
-        .alert("등록 완료", isPresented: $showSuccessAlert) {
-            Button("어르신 초대하기") {
-                shareInviteLink()
-            }
-            Button("나중에", role: .cancel) {
-                completeRegistration()
-            }
-        } message: {
-            Text("보호자 등록이 완료되었습니다.\n카카오톡으로 어르신을 초대해 보세요!")
+            .navigationViewStyle(.stack)
         }
     }
 
-    // MARK: - View Components
+    @ViewBuilder
+    private var mainContent: some View {
+        ScrollView {
+            VStack(spacing: 24) {
+                // 헤더 설명
+                headerSection
 
-    private var headerSection: some View {
-        VStack(spacing: 8) {
-            Text("보호자 정보를 등록해 주세요")
-                .font(.title2)
-                .fontWeight(.bold)
+                // 기본 정보 섹션
+                basicInfoSection
 
-            Text("어르신 정보를 입력하시면\n자동으로 연결됩니다")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .padding(.vertical)
-    }
+                // AI 케어 정보 섹션
+                aiCareInfoSection
 
-    private var kakaoProfileSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("내 정보")
-                .font(.headline)
-                .foregroundColor(.secondary)
+                // AI 전화 스케줄 섹션
+                aiCallScheduleSection
 
-            HStack(spacing: 16) {
-                // 프로필 이미지
-                if let imageUrl = kakaoUserInfo.profileImageUrl {
-                    AsyncImage(url: imageUrl) { image in
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } placeholder: {
-                        Image(systemName: "person.circle.fill")
-                            .font(.system(size: 60))
-                            .foregroundColor(.gray)
-                    }
-                    .frame(width: 60, height: 60)
-                    .clipShape(Circle())
-                } else {
-                    Image(systemName: "person.circle.fill")
-                        .font(.system(size: 60))
-                        .foregroundColor(.gray)
+                // 에러 메시지
+                if let error = errorMessage {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.red)
+                        .padding(.horizontal)
                 }
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(kakaoUserInfo.nickname ?? "사용자")
-                        .font(.headline)
-
-                    if let email = kakaoUserInfo.email {
-                        Text(email)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-
-                    HStack(spacing: 4) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.yellow)
-                            .font(.caption)
-                        Text("카카오 연동")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-
-                Spacer()
+                // 등록 버튼
+                registerButton
             }
             .padding()
-            .background(Color(.secondarySystemBackground))
-            .cornerRadius(12)
+        }
+        .background(Color.creamRice)
+        .sheet(isPresented: $showScheduleSheet) {
+            AICallScheduleEditView(
+                scheduleItems: $scheduleItems,
+                isEnabled: $isScheduleEnabled
+            )
+        }
+        .onAppear {
+            if useDummyData {
+                fillWithDummyData()
+            }
         }
     }
 
-    private var wardInfoSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("어르신 정보")
-                .font(.headline)
+    // MARK: - 더미 데이터 (개발용)
+
+    private func fillWithDummyData() {
+        wardName = "테스트어르신_\(AppConfig.selectedDeveloperName)"
+        selectedRelation = .parent
+        // StartView에서 선택한 개발자에 해당하는 어르신 이메일 자동 입력
+        wardEmail = AppConfig.selectedDevWardEmail
+        phoneNumber = "010-1234-5678"
+        birthDate = "19450315"
+        selectedGender = .female
+        address = "서울시 강남구 테헤란로 123"
+        medicalConditions = "고혈압, 당뇨"
+        medications = "혈압약(아침), 당뇨약(아침/저녁)"
+        isScheduleEnabled = true
+        scheduleItems = [
+            AICallScheduleItem(
+                time: Calendar.current.date(from: DateComponents(hour: 10, minute: 0)) ?? Date(),
+                weekdays: [.monday, .tuesday, .wednesday, .thursday, .friday],
+                isEnabled: true
+            )
+        ]
+    }
+
+    // MARK: - 헤더 섹션
+
+    private var headerSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("AI가 맞춤형 대화를 할 수 있도록")
+                .font(.body)
                 .foregroundColor(.secondary)
+            Text("어르신의 정보를 자세히 알려주세요.")
+                .font(.body)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 8)
+    }
 
-            VStack(spacing: 16) {
-                // 이메일 입력
+    // MARK: - 기본 정보 섹션
+
+    private var basicInfoSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("기본 정보")
+                .font(.headline)
+
+            VStack(spacing: 12) {
+                // 성함 + 관계
+                HStack(spacing: 12) {
+                    // 성함
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label("성함", systemImage: "person")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        TextField("홍길동", text: $wardName)
+                            .textContentType(.name)
+                            .padding()
+                            .background(Color(.tertiarySystemBackground))
+                            .cornerRadius(10)
+                            .focused($focusedField, equals: .wardName)
+                    }
+                    .frame(maxWidth: .infinity)
+
+                    // 관계
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("관계")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Menu {
+                            ForEach(WardRelationType.allCases) { relation in
+                                Button(relation.displayName) {
+                                    selectedRelation = relation
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text(selectedRelation.displayName)
+                                    .foregroundColor(.primary)
+                                    .lineLimit(1)
+                                    .fixedSize(horizontal: true, vertical: false)
+                                Spacer()
+                                Image(systemName: "chevron.down")
+                                    .foregroundColor(.secondary)
+                                    .font(.caption)
+                            }
+                            .padding()
+                            .background(Color(.tertiarySystemBackground))
+                            .cornerRadius(10)
+                        }
+                    }
+                    .frame(width: 120)
+                }
+
+                // 이메일 (연동용) - 가장 중요!
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("이메일")
-                        .font(.subheadline)
+                    Label("이메일 (연동용)", systemImage: "envelope")
+                        .font(.caption)
                         .foregroundColor(.secondary)
-
-                    TextField("어르신의 이메일 주소", text: $wardEmail)
+                    TextField("elder@example.com", text: $wardEmail)
                         .textContentType(.emailAddress)
                         .keyboardType(.emailAddress)
                         .autocapitalization(.none)
                         .padding()
                         .background(Color(.tertiarySystemBackground))
                         .cornerRadius(10)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(emailValidationColor, lineWidth: wardEmail.isEmpty ? 0 : 1)
-                        )
                         .focused($focusedField, equals: .wardEmail)
-
-                    if !wardEmail.isEmpty && !isValidEmail {
-                        Text("올바른 이메일 형식을 입력해 주세요")
-                            .font(.caption)
-                            .foregroundColor(.red)
-                    }
                 }
 
-                // 전화번호 입력
+                // 휴대폰 번호
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("전화번호")
-                        .font(.subheadline)
+                    Label("휴대폰 번호", systemImage: "phone")
+                        .font(.caption)
                         .foregroundColor(.secondary)
-
-                    TextField("어르신의 전화번호", text: $wardPhoneNumber)
+                    TextField("010-1234-5678", text: $phoneNumber)
                         .textContentType(.telephoneNumber)
                         .keyboardType(.phonePad)
                         .padding()
                         .background(Color(.tertiarySystemBackground))
                         .cornerRadius(10)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(phoneValidationColor, lineWidth: wardPhoneNumber.isEmpty ? 0 : 1)
-                        )
-                        .focused($focusedField, equals: .wardPhoneNumber)
-                        .onChange(of: wardPhoneNumber) { _, newValue in
-                            wardPhoneNumber = formatPhoneNumber(newValue)
+                        .focused($focusedField, equals: .phoneNumber)
+                        .onChange(of: phoneNumber) { _, newValue in
+                            phoneNumber = formatPhoneNumber(newValue)
                         }
+                }
 
-                    if !wardPhoneNumber.isEmpty && !isValidPhoneNumber {
-                        Text("올바른 전화번호 형식을 입력해 주세요")
+                // 생년월일 + 성별
+                HStack(spacing: 12) {
+                    // 생년월일
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label("생년월일", systemImage: "calendar")
                             .font(.caption)
-                            .foregroundColor(.red)
+                            .foregroundColor(.secondary)
+                        TextField("YYYYMMDD", text: $birthDate)
+                            .keyboardType(.numberPad)
+                            .padding()
+                            .background(Color(.tertiarySystemBackground))
+                            .cornerRadius(10)
+                            .focused($focusedField, equals: .birthDate)
+                            .onChange(of: birthDate) { _, newValue in
+                                birthDate = String(newValue.filter { $0.isNumber }.prefix(8))
+                            }
                     }
+
+                    // 성별
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("성별")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        HStack(spacing: 0) {
+                            ForEach(Gender.allCases, id: \.rawValue) { gender in
+                                Button {
+                                    selectedGender = gender
+                                } label: {
+                                    Text(gender.displayName)
+                                        .font(.subheadline)
+                                        .fontWeight(selectedGender == gender ? .semibold : .regular)
+                                        .foregroundColor(selectedGender == gender ? .primary : .secondary)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 14)
+                                        .background(
+                                            selectedGender == gender
+                                                ? Color(.tertiarySystemBackground)
+                                                : Color.clear
+                                        )
+                                }
+                            }
+                        }
+                        .background(Color(.quaternarySystemFill))
+                        .cornerRadius(10)
+                    }
+                    .frame(width: 140)
+                }
+
+                // 거주지 주소
+                VStack(alignment: .leading, spacing: 6) {
+                    Label("거주지 주소", systemImage: "location")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    TextField("주소 검색...", text: $address)
+                        .textContentType(.fullStreetAddress)
+                        .padding()
+                        .background(Color(.tertiarySystemBackground))
+                        .cornerRadius(10)
+                        .focused($focusedField, equals: .address)
                 }
             }
             .padding()
@@ -235,6 +324,95 @@ struct GuardianRegistrationView: View {
             .cornerRadius(12)
         }
     }
+
+    // MARK: - AI 케어 정보 섹션
+
+    private var aiCareInfoSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("AI 케어 정보 (선택)")
+                    .font(.headline)
+                Text("입력해주시면 AI가 안부 전화 시 해당 내용을 체크합니다.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            VStack(spacing: 12) {
+                // 기저질환
+                VStack(alignment: .leading, spacing: 6) {
+                    Label("기저질환 / 앓고 계신 병", systemImage: "cross.case")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    TextField("예: 고혈압, 당뇨, 관절염", text: $medicalConditions)
+                        .padding()
+                        .background(Color(.tertiarySystemBackground))
+                        .cornerRadius(10)
+                        .focused($focusedField, equals: .medicalConditions)
+                }
+
+                // 복용 중인 약
+                VStack(alignment: .leading, spacing: 6) {
+                    Label("복용 중인 약", systemImage: "pills")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    TextField("예: 혈압약(아침), 수면제", text: $medications)
+                        .padding()
+                        .background(Color(.tertiarySystemBackground))
+                        .cornerRadius(10)
+                        .focused($focusedField, equals: .medications)
+                }
+            }
+            .padding()
+            .background(Color(.secondarySystemBackground))
+            .cornerRadius(12)
+        }
+    }
+
+    // MARK: - AI 전화 스케줄 섹션
+
+    private var aiCallScheduleSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("AI 안부 전화 스케줄 (선택)")
+                        .font(.headline)
+                    Text("설정한 시간에 AI가 어르신께 안부 전화를 드립니다.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                Toggle("", isOn: $isScheduleEnabled)
+                    .labelsHidden()
+            }
+
+            if isScheduleEnabled {
+                VStack(spacing: 12) {
+                    ForEach(scheduleItems) { item in
+                        ScheduleItemRow(item: item) {
+                            showScheduleSheet = true
+                        }
+                    }
+
+                    Button {
+                        showScheduleSheet = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "plus.circle.fill")
+                            Text("스케줄 추가")
+                        }
+                        .font(.subheadline)
+                        .foregroundColor(.blue)
+                    }
+                    .padding(.top, 4)
+                }
+                .padding()
+                .background(Color(.secondarySystemBackground))
+                .cornerRadius(12)
+            }
+        }
+    }
+
+    // MARK: - 등록 버튼
 
     private var registerButton: some View {
         Button(action: register) {
@@ -243,8 +421,9 @@ struct GuardianRegistrationView: View {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                 } else {
-                    Text("가입하기")
+                    Text(isAddingWard ? "어르신 추가하기" : "저장하고 연동하기")
                         .font(.headline)
+                    Image(systemName: "chevron.right")
                 }
             }
             .foregroundColor(.white)
@@ -252,11 +431,12 @@ struct GuardianRegistrationView: View {
             .padding(.vertical, 16)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(isFormValid ? Color.blue : Color.gray)
+                    .fill(isFormValid ? Color(hex: "1F2937") : Color.gray)
             )
         }
         .disabled(!isFormValid || isLoading)
         .padding(.top, 8)
+        .padding(.bottom, 32)
     }
 
     // MARK: - Validation
@@ -268,22 +448,18 @@ struct GuardianRegistrationView: View {
     }
 
     private var isValidPhoneNumber: Bool {
-        let digitsOnly = wardPhoneNumber.replacingOccurrences(of: "-", with: "")
-        return digitsOnly.count >= 10 && digitsOnly.count <= 11 && digitsOnly.allSatisfy { $0.isNumber }
+        let digitsOnly = phoneNumber.replacingOccurrences(of: "-", with: "")
+        return digitsOnly.isEmpty || (digitsOnly.count >= 10 && digitsOnly.count <= 11 && digitsOnly.allSatisfy { $0.isNumber })
+    }
+
+    private var isValidBirthDate: Bool {
+        birthDate.count == 8 && birthDate.allSatisfy { $0.isNumber }
     }
 
     private var isFormValid: Bool {
-        isValidEmail && isValidPhoneNumber
-    }
-
-    private var emailValidationColor: Color {
-        if wardEmail.isEmpty { return .clear }
-        return isValidEmail ? .green : .red
-    }
-
-    private var phoneValidationColor: Color {
-        if wardPhoneNumber.isEmpty { return .clear }
-        return isValidPhoneNumber ? .green : .red
+        !wardName.trimmingCharacters(in: .whitespaces).isEmpty &&
+        isValidEmail &&
+        isValidBirthDate
     }
 
     private func formatPhoneNumber(_ number: String) -> String {
@@ -303,40 +479,6 @@ struct GuardianRegistrationView: View {
         }
     }
 
-    // MARK: - Registration Complete
-
-    private func completeRegistration() {
-        // 로그인 상태 업데이트
-        if let user = pendingUser {
-            appState.didLogin(user: user)
-        }
-        onRegistrationComplete(wardEmail)
-    }
-
-    // MARK: - Kakao Share
-
-    private func shareInviteLink() {
-        guard let guardianId = registeredGuardianId else {
-            completeRegistration()
-            return
-        }
-
-        Task {
-            do {
-                try await KakaoLinkService.shared.shareInviteLink(
-                    guardianId: guardianId,
-                    guardianName: kakaoUserInfo.nickname ?? "보호자",
-                    wardEmail: wardEmail
-                )
-            } catch {
-                // 공유 실패해도 진행
-                print("[GuardianRegistrationView] 카카오 공유 실패: \(error.localizedDescription)")
-            }
-            // 공유 후 대시보드로 이동
-            completeRegistration()
-        }
-    }
-
     // MARK: - Registration
 
     private func register() {
@@ -346,52 +488,124 @@ struct GuardianRegistrationView: View {
 
         Task {
             do {
-                let response = try await AuthService.shared.registerGuardian(
-                    wardEmail: wardEmail,
-                    wardPhoneNumber: wardPhoneNumber.replacingOccurrences(of: "-", with: "")
+                // 기본 정보 구성
+                let basicInfo = WardBasicInfo(
+                    name: wardName,
+                    relation: selectedRelation,
+                    phoneNumber: phoneNumber.replacingOccurrences(of: "-", with: ""),
+                    birthDate: birthDate,
+                    gender: selectedGender,
+                    address: address
                 )
 
-                // 응답에 user가 있으면 저장 (아직 didLogin 호출 안함 - Alert 먼저 표시)
+                // AI 케어 정보 구성 (입력이 있을 때만)
+                let aiCareInfo: AICarInfo? = (medicalConditions.isEmpty && medications.isEmpty)
+                    ? nil
+                    : AICarInfo(medicalConditions: medicalConditions, medications: medications)
+
+                // 스케줄 구성
+                let schedule: AICallSchedule? = isScheduleEnabled && !scheduleItems.isEmpty
+                    ? AICallSchedule(items: scheduleItems, isEnabled: true)
+                    : nil
+
                 let user: UserMeResponse
-                if let responseUser = response.user {
-                    guard responseUser.nickname != nil else {
-                        errorMessage = "사용자 닉네임 정보가 없습니다. 카카오 계정 설정을 확인해주세요."
-                        isLoading = false
-                        return
-                    }
-                    guard responseUser.email != nil else {
-                        errorMessage = "사용자 이메일 정보가 없습니다. 카카오 계정 설정을 확인해주세요."
+
+                if useDummyData {
+                    // 개발용 API 호출 (카카오 로그인 없이)
+                    let authResponse = try await AuthService.shared.registerDevGuardian(
+                        wardEmail: wardEmail,
+                        wardPhoneNumber: phoneNumber.replacingOccurrences(of: "-", with: ""),
+                        wardBasicInfo: basicInfo,
+                        aiCareInfo: aiCareInfo,
+                        callSchedule: schedule,
+                        guardianNickname: "테스트보호자_\(AppConfig.selectedDeveloperName)",
+                        guardianEmail: nil
+                    )
+
+                    guard let responseUser = authResponse.user else {
+                        errorMessage = "사용자 정보를 받지 못했습니다."
                         isLoading = false
                         return
                     }
                     user = responseUser
                 } else {
-                    // user가 없으면 서버에서 조회
-                    let userInfo = try await AuthService.shared.getMe()
-                    guard userInfo.nickname != nil else {
-                        errorMessage = "사용자 닉네임 정보가 없습니다. 카카오 계정 설정을 확인해주세요."
-                        isLoading = false
-                        return
+                    // 일반 API 호출
+                    let response = try await AuthService.shared.registerGuardian(
+                        wardEmail: wardEmail,
+                        wardPhoneNumber: phoneNumber.replacingOccurrences(of: "-", with: ""),
+                        wardBasicInfo: basicInfo,
+                        aiCareInfo: aiCareInfo,
+                        callSchedule: schedule
+                    )
+
+                    // 사용자 정보 처리
+                    if let responseUser = response.user {
+                        guard responseUser.nickname != nil else {
+                            errorMessage = "사용자 닉네임 정보가 없습니다."
+                            isLoading = false
+                            return
+                        }
+                        user = responseUser
+                    } else {
+                        let userInfo = try await AuthService.shared.getMe()
+                        guard userInfo.nickname != nil else {
+                            errorMessage = "사용자 닉네임 정보가 없습니다."
+                            isLoading = false
+                            return
+                        }
+                        user = userInfo
                     }
-                    guard userInfo.email != nil else {
-                        errorMessage = "사용자 이메일 정보가 없습니다. 카카오 계정 설정을 확인해주세요."
-                        isLoading = false
-                        return
-                    }
-                    user = userInfo
                 }
 
-                // Alert 표시를 위해 임시 저장 (didLogin은 Alert 버튼 클릭 시 호출)
                 pendingUser = user
-                registeredGuardianId = response.resolvedGuardianId
-                showSuccessAlert = true
+                completeRegistration()
             } catch {
                 errorMessage = error.localizedDescription
             }
             isLoading = false
         }
     }
+
+    private func completeRegistration() {
+        guard let user = pendingUser else { return }
+        appState.didLogin(user: user)
+        onRegistrationComplete(wardEmail, user)
+    }
 }
+
+// MARK: - Schedule Item Row
+
+struct ScheduleItemRow: View {
+    let item: AICallScheduleItem
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.timeString)
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                    Text(item.weekdaysSummary)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .foregroundColor(.secondary)
+                    .font(.caption)
+            }
+            .padding()
+            .background(Color(.tertiarySystemBackground))
+            .cornerRadius(10)
+        }
+    }
+}
+
+// MARK: - Preview
 
 #Preview {
     GuardianRegistrationView(
@@ -401,7 +615,7 @@ struct GuardianRegistrationView: View {
             email: "hong@email.com",
             profileImageUrl: nil
         ),
-        onRegistrationComplete: { wardEmail in print("Complete with \(wardEmail)") }
+        onRegistrationComplete: { _, _ in }
     )
     .environmentObject(AppState())
 }

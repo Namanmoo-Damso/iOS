@@ -70,8 +70,14 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         DispatchQueue.main.async {
             self.configureUserNotifications(application)
             self.configureVoipPushRegistry()
-            self.registerCachedTokensIfAvailable()
+            self.logCachedTokens()
         }
+
+        // VAD 모델 미리 로드 (통화 시작 전 준비)
+        Task { @MainActor in
+            await VadService.shared.loadModel()
+        }
+
         return true
     }
 
@@ -91,6 +97,31 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         }
         debugLog("🔵 카카오 로그인 URL 아님")
         return false
+    }
+
+    // MARK: - Universal Links Handler
+
+    func application(
+        _ application: UIApplication,
+        continue userActivity: NSUserActivity,
+        restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void
+    ) -> Bool {
+        debugLog("🔗 Universal Link 수신")
+
+        guard userActivity.activityType == NSUserActivityTypeBrowsingWeb,
+              let url = userActivity.webpageURL else {
+            debugLog("🔗 Universal Link 아님")
+            return false
+        }
+
+        debugLog("🔗 Universal Link URL: \(url)")
+
+        // DeeplinkManager로 처리 위임
+        Task { @MainActor in
+            DeeplinkManager.shared.handleUniversalLink(url: url)
+        }
+
+        return true
     }
 
     // MARK: - Notification Setup
@@ -118,19 +149,14 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         )
         center.setNotificationCategories([callCategory])
 
-        debugLog("requesting notification authorization")
-        diagLog("requesting notification authorization")
-        center.requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
-            if let error = error {
-                self.debugLog("notification authorization error: \(error)")
-                self.diagLog("notification authorization error: \(error)")
-            } else {
-                self.debugLog("notification authorization granted=\(granted)")
-                self.diagLog("notification authorization granted=\(granted)")
-            }
-            guard granted else { return }
-            DispatchQueue.main.async {
-                application.registerForRemoteNotifications()
+        // 알림 권한 요청은 PermissionOnboardingView에서 처리
+        // 이미 권한이 부여된 경우에만 원격 알림 등록
+        center.getNotificationSettings { settings in
+            self.debugLog("notification settings status=\(settings.authorizationStatus.rawValue)")
+            if settings.authorizationStatus == .authorized {
+                DispatchQueue.main.async {
+                    application.registerForRemoteNotifications()
+                }
             }
         }
     }
@@ -176,99 +202,30 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         diagLog("APNs registration failed: \(error)")
     }
 
-    // MARK: - Token Registration
+    // MARK: - Token Caching
 
-    func registerCachedTokensIfAvailable() {
+    /// 캐시된 토큰 로그 출력 (디버깅용)
+    func logCachedTokens() {
         let apnsToken = UserDefaults.standard.cachedApnsToken
         let voipToken = UserDefaults.standard.cachedVoipToken
         debugLog("cached tokens apns=\(summarizeToken(apnsToken)) voip=\(summarizeToken(voipToken))")
         if let apnsToken { diagLog("cached APNs token full=\(apnsToken)") }
         if let voipToken { diagLog("cached VoIP token full=\(voipToken)") }
-        if apnsToken != nil || voipToken != nil {
-            registerDeviceToken(apnsToken: apnsToken, voipToken: voipToken)
-        }
     }
 
-    private func stableIdentity() -> String {
-        if let stored = UserDefaults.standard.userIdentity {
-            return stored
-        }
-        let newIdentity = "ios-\(UUID().uuidString)"
-        UserDefaults.standard.userIdentity = newIdentity
-        return newIdentity
-    }
-
+    /// 디바이스 토큰 캐싱 (서버 등록은 로그인 후 AuthService/PushNotificationService에서 처리)
     func registerDeviceToken(apnsToken: String?, voipToken: String?) {
-        let identity = stableIdentity()
-        debugLog("registerDeviceToken identity=\(identity) env=\(apnsEnv) apns=\(summarizeToken(apnsToken)) voip=\(summarizeToken(voipToken))")
-
-        let apiBase = AppConfig.apiBaseURL
-        let urlString = "\(apiBase)/v1/devices/register"
-        guard let url = URL(string: urlString) else {
-            debugLog("Failed to create URL from: \(urlString)")
-            return
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        var currentApns = apnsToken
-        var currentVoip = voipToken
-
+        // 토큰 캐싱만 수행 (로그인 전에도 토큰은 저장)
         if let newApns = apnsToken {
             UserDefaults.standard.cachedApnsToken = newApns
-        } else {
-            currentApns = UserDefaults.standard.cachedApnsToken
+            debugLog("APNs token cached: \(summarizeToken(newApns))")
         }
-
         if let newVoip = voipToken {
             UserDefaults.standard.cachedVoipToken = newVoip
-        } else {
-            currentVoip = UserDefaults.standard.cachedVoipToken
+            debugLog("VoIP token cached: \(summarizeToken(newVoip))")
         }
 
-        let supportsCallKit = resolveCallCapability() == .callKit
-        var body: [String: Any] = [
-            "identity": identity,
-            "displayName": "iOS User",
-            "platform": "ios",
-            "env": apnsEnv,
-            "supportsCallKit": supportsCallKit
-        ]
-        if let apns = currentApns, !apns.isEmpty {
-            body["apnsToken"] = apns
-        }
-        // WiFi-only iPad는 voipToken을 전송하지 않음
-        if supportsCallKit, let voip = currentVoip, !voip.isEmpty {
-            body["voipToken"] = voip
-        }
-        if body["apnsToken"] == nil && body["voipToken"] == nil {
-            debugLog("skip registerDeviceToken (no tokens)")
-            return
-        }
-
-        do {
-            request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        } catch {
-            print("Failed to serialize register body:", error)
-            return
-        }
-
-        Task {
-            do {
-                let (data, response) = try await URLSession.shared.data(for: request)
-                if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
-                    debugLog("device registered status=\(httpResponse.statusCode)")
-                } else {
-                    if let httpResponse = response as? HTTPURLResponse {
-                        let bodyText = String(data: data, encoding: .utf8) ?? ""
-                        debugLog("device registration failed status=\(httpResponse.statusCode) body=\(bodyText)")
-                    }
-                }
-            } catch {
-                debugLog("device registration error: \(error)")
-            }
-        }
+        // 서버 등록은 로그인 후 AuthService.loginWithKakao에서
+        // PushNotificationService.registerDeviceTokens를 호출하여 처리
     }
 }

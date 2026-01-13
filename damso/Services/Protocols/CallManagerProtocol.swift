@@ -1,5 +1,8 @@
 import Foundation
 import Combine
+#if canImport(CallKit)
+import CallKit
+#endif
 
 @MainActor
 protocol CallStateStoreProtocol: ObservableObject {
@@ -22,4 +25,7 @@ protocol CallManagerProtocol {
     )
     func answerCall(uuid: UUID)
     func endCall(uuid: UUID)
+    #if canImport(CallKit)
+    func reportCallEnded(uuid: UUID, reason: CXCallEndedReason)
+    #endif
 }
