@@ -87,7 +87,7 @@ final class VadService: ObservableObject {
                 return
             }
 
-            var config = MLModelConfiguration()
+            let config = MLModelConfiguration()
             config.computeUnits = .all  // Neural Engine 활용
 
             let mlModel = try MLModel(contentsOf: modelURL, configuration: config)

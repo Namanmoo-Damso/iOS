@@ -51,7 +51,7 @@ final class DeeplinkManager: ObservableObject {
     static let shared = DeeplinkManager()
 
     /// Universal Link 도메인
-    private static let universalLinkHost = "2.sodam.store"
+    private static let universalLinkHost = "1.sodam.store"
 
     /// 딥링크로 요청된 사용자 타입
     @Published var requestedUserType: UserType?
@@ -95,7 +95,7 @@ final class DeeplinkManager: ObservableObject {
         }
     }
 
-    /// Universal Link URL 처리 (https://2.sodam.store/)
+    /// Universal Link URL 처리 (https://1.sodam.store/)
     func handleUniversalLink(url: URL) {
         guard let host = url.host, host == Self.universalLinkHost else {
             print("[DeeplinkManager] Universal Link 도메인 불일치: \(url.host ?? "nil")")
@@ -110,7 +110,7 @@ final class DeeplinkManager: ObservableObject {
 
         switch path {
         case "/invite":
-            // https://2.sodam.store/invite?guardian_id=xxx
+            // https://1.sodam.store/invite?guardian_id=xxx
             // 어르신 초대 링크 - 자동으로 카카오 로그인까지 진행
             print("[DeeplinkManager] 🔗 어르신 초대 링크 수신")
             requestedUserType = .ward

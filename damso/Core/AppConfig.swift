@@ -2,10 +2,10 @@ import Foundation
 
 @MainActor
 struct AppConfig {
-    /// 현재 설정된 서버 도메인 (기본값은 sodam.store)
+    /// 현재 설정된 서버 도메인 (기본값은 1.sodam.store)
     static var serverDomain: String {
         get {
-            UserDefaults.standard.selectedServerDomain ?? "sodam.store"
+            UserDefaults.standard.selectedServerDomain ?? "1.sodam.store"
         }
         set {
             UserDefaults.standard.selectedServerDomain = newValue

@@ -165,36 +165,36 @@ struct UserTypeSelectionView: View {
                 .opacity(isAnimating ? 1 : 0)
                 .animation(.easeIn.delay(0.3), value: isAnimating)
 
-                // 보호자 테스트 버튼 (dev API 사용)
-                Button {
-                    performDevLogin()
-                } label: {
-                    HStack(spacing: 8) {
-                        if isDevLoggingIn {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .orange))
-                        } else {
-                            Image(systemName: "hammer.fill")
-                                .font(.system(size: 14))
-                            Text("보호자 테스트 (더미 데이터)")
-                                .font(.system(size: 14, weight: .medium))
-                        }
-                    }
-                    .foregroundColor(.orange)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 44)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.orange.opacity(0.5), lineWidth: 1)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(Color.orange.opacity(0.1))
-                            )
-                    )
-                }
-                .disabled(isDevLoggingIn)
-                .padding(.horizontal, 24)
-                .padding(.top, 8)
+                // 보호자 테스트 버튼 (dev API 사용) - 숨김 처리
+                // Button {
+                //     performDevLogin()
+                // } label: {
+                //     HStack(spacing: 8) {
+                //         if isDevLoggingIn {
+                //             ProgressView()
+                //                 .progressViewStyle(CircularProgressViewStyle(tint: .orange))
+                //         } else {
+                //             Image(systemName: "hammer.fill")
+                //                 .font(.system(size: 14))
+                //             Text("보호자 테스트 (더미 데이터)")
+                //                 .font(.system(size: 14, weight: .medium))
+                //         }
+                //     }
+                //     .foregroundColor(.orange)
+                //     .frame(maxWidth: .infinity)
+                //     .frame(height: 44)
+                //     .background(
+                //         RoundedRectangle(cornerRadius: 10)
+                //             .stroke(Color.orange.opacity(0.5), lineWidth: 1)
+                //             .background(
+                //                 RoundedRectangle(cornerRadius: 10)
+                //                     .fill(Color.orange.opacity(0.1))
+                //             )
+                //     )
+                // }
+                // .disabled(isDevLoggingIn)
+                // .padding(.horizontal, 24)
+                // .padding(.top, 8)
 
                 Spacer()
                     .frame(height: 40)

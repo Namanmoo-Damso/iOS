@@ -330,9 +330,10 @@ struct ContentView: View {
             return
         }
 
-        // 항상 서버 선택 화면(StartView)부터 시작
-        Log.ui.i("서버 선택 화면으로 이동 (항상 StartView부터 시작)")
-        navigationState = .serverSelection
+        // 서버 선택 화면 건너뛰고 바로 사용자 타입 선택으로 이동
+        // 기본 서버는 AppConfig.serverDomain (1.sodam.store)
+        Log.ui.i("사용자 타입 선택 화면으로 이동 (기본 서버: \(AppConfig.serverDomain))")
+        handleServerSelected()
     }
 
     private func handleLoginSuccess(userType: UserType, loginResult: KakaoLoginResult) {
