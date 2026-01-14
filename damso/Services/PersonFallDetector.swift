@@ -130,7 +130,7 @@ final class PersonFallDetector: ObservableObject {
             }
             .store(in: &cancellables)
 
-        // 주기적 얼굴 실종 체크 (0.5초마다)
+        // 주기적 얼굴 실종 체크
         Timer.publish(every: 0.5, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in

@@ -125,6 +125,9 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         debugLog("handleIncomingCallFromAPNs caller=\(caller) room=\(roomName ?? "nil") callId=\(callId ?? "nil")")
 
         Task { @MainActor in
+            // 벨소리 + 진동 시작
+            RingtonePlayer.shared.startRinging()
+
             CallStateStore.shared.setIncoming(
                 uuid: UUID(),
                 callId: callId,
@@ -149,6 +152,9 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
         debugLog("handleAcceptCallFromAPNs caller=\(caller) room=\(roomName ?? "nil") callId=\(callId ?? "nil")")
 
         Task { @MainActor in
+            // 벨소리 + 진동 중지
+            RingtonePlayer.shared.stopRinging()
+
             CallStateStore.shared.setAnswered(
                 uuid: UUID(),
                 callId: callId,
@@ -161,6 +167,11 @@ extension AppDelegate: UNUserNotificationCenterDelegate {
 
     /// 일반 APNs에서 통화 거절 처리 (WiFi-only iPad)
     func handleDeclineCallFromAPNs(userInfo: [AnyHashable: Any]) {
+        // 벨소리 + 진동 중지
+        Task { @MainActor in
+            RingtonePlayer.shared.stopRinging()
+        }
+
         guard let callId = userInfo["callId"] as? String ?? userInfo["call_id"] as? String else {
             debugLog("decline call: no callId found")
             return

@@ -268,12 +268,13 @@ final class MotionSensorService: ObservableObject, MotionSensorProtocol {
 
         var fallRisk: Float = 0.0
 
+        // 총 기여도 = 1.0 (0.25 + 0.25 + 0.2 + 0.1 + 0.2)
         // 1. 자유 낙하 감지 (가속도가 거의 0)
         if accelMagnitude < MotionSensorData.freefallThreshold {
             if freefallStartTime == nil {
                 freefallStartTime = Date()
             }
-            fallRisk += 0.3
+            fallRisk += 0.25
         } else {
             // 자유 낙하 후 충격 확인
             if let startTime = freefallStartTime {
@@ -294,7 +295,7 @@ final class MotionSensorService: ObservableObject, MotionSensorProtocol {
 
         // 2. 단독 충격 감지
         if accelMagnitude > MotionSensorData.impactThreshold {
-            fallRisk += 0.4
+            fallRisk += 0.25
         }
 
         // 3. 급격한 회전 감지
@@ -313,10 +314,16 @@ final class MotionSensorService: ObservableObject, MotionSensorProtocol {
             }
         }
 
+        // 5. 큰 소리/비명 감지 (움직임과 동시 발생 시 낙상 확률 증가)
+        if UserAudioLevelMonitor.shared.isWarningActive {
+            fallRisk += 0.2
+            debugLog("🔊 Loud voice detected, adding to fall risk (+0.2)")
+        }
+
         fallRisk = min(1.0, fallRisk)
 
-        // 위험도가 0.8 이상이면 낙상으로 판단
-        return (fallRisk >= 0.8, fallRisk)
+        // 위험도가 0.7 이상이면 낙상으로 판단
+        return (fallRisk >= 0.7, fallRisk)
     }
 
     // MARK: - Data Channel

@@ -7,6 +7,8 @@ struct FullScreenCallView: View {
     @ObservedObject private var networkMonitor = NetworkMonitor.shared
     @ObservedObject private var audioVisualizer = AudioVisualizerManager.shared
     @ObservedObject private var transcription = TranscriptionManager.shared
+    // Singleton이지만 View의 생명주기 동안 관찰을 보장하기 위해 StateObject 사용 고려, 그러나 shared 인스턴스이므로 ObservedObject 유지하되 MainActor 보장
+    @ObservedObject private var careAlertService = CareAlertService.shared
 
     // Shortcut accessors
     var room: Room { viewModel.room }
@@ -216,7 +218,7 @@ struct FullScreenCallView: View {
         } message: {
             Text("인터넷 연결을 확인해주세요.")
         }
-        .alert("셀룰러 데이터 사용", isPresented: $showCellularWarning) {
+        .alert("현재 셀룰러 데이터 사용", isPresented: $showCellularWarning) {
             Button("계속 진행") { proceedWithCall() }
             Button(pendingIncomingCall ? "거절" : "취소", role: .cancel) {
                 if pendingIncomingCall {
@@ -227,6 +229,16 @@ struct FullScreenCallView: View {
             }
         } message: {
             Text("현재 셀룰러 데이터를 사용 중입니다.\n영상통화는 많은 데이터를 소모할 수 있습니다.")
+        }
+        .alert("괜찮으세요?", isPresented: $careAlertService.showFallConfirmationAlert) {
+            Button("괜찮아요", role: .cancel) {
+                careAlertService.dismissDangerAlert()
+            }
+            Button("도움이 필요해요", role: .destructive) {
+                careAlertService.requestHelp()
+            }
+        } message: {
+            Text(careAlertService.alertMessage)
         }
         .onAppear {
             if viewModel.isConnected {

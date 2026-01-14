@@ -47,6 +47,17 @@ enum CareAlertType: String, Codable, Sendable {
 
     /// 감정 분석 결과
     case emotion = "emotion"
+
+    /// 위험 상황 해제 (사용자 확인)
+    case dangerDismissed = "danger_dismissed"
+
+    // MARK: - Agent → iOS 요청 타입
+
+    /// Agent가 낙상 확인 Alert 표시 요청 (음성 질문 후 응답 없을 때)
+    case requestFallConfirmation = "request_fall_confirmation"
+
+    /// Agent가 긴급 상황 확정 (보호자 알림 필요)
+    case emergencyConfirmed = "emergency_confirmed"
 }
 
 // MARK: - Alert Severity
@@ -67,6 +78,9 @@ enum CareAlertData: Codable, Sendable {
     case personFall(PersonFallAlertData)
     case loudVoice(LoudVoiceAlertData)
     case emotion(EmotionAlertData)
+    case dangerDismissed(DangerDismissedData)
+    case requestFallConfirmation(RequestFallConfirmationData)
+    case emergencyConfirmed(EmergencyConfirmedData)
 
     // MARK: - Codable
 
@@ -92,6 +106,15 @@ enum CareAlertData: Codable, Sendable {
         case "emotion":
             let payload = try container.decode(EmotionAlertData.self, forKey: .payload)
             self = .emotion(payload)
+        case "danger_dismissed":
+            let payload = try container.decode(DangerDismissedData.self, forKey: .payload)
+            self = .dangerDismissed(payload)
+        case "request_fall_confirmation":
+            let payload = try container.decode(RequestFallConfirmationData.self, forKey: .payload)
+            self = .requestFallConfirmation(payload)
+        case "emergency_confirmed":
+            let payload = try container.decode(EmergencyConfirmedData.self, forKey: .payload)
+            self = .emergencyConfirmed(payload)
         default:
             throw DecodingError.dataCorruptedError(
                 forKey: .type,
@@ -116,6 +139,15 @@ enum CareAlertData: Codable, Sendable {
             try container.encode(data, forKey: .payload)
         case .emotion(let data):
             try container.encode("emotion", forKey: .type)
+            try container.encode(data, forKey: .payload)
+        case .dangerDismissed(let data):
+            try container.encode("danger_dismissed", forKey: .type)
+            try container.encode(data, forKey: .payload)
+        case .requestFallConfirmation(let data):
+            try container.encode("request_fall_confirmation", forKey: .type)
+            try container.encode(data, forKey: .payload)
+        case .emergencyConfirmed(let data):
+            try container.encode("emergency_confirmed", forKey: .type)
             try container.encode(data, forKey: .payload)
         }
     }
@@ -234,6 +266,92 @@ struct EmotionAlertData: Codable, Sendable {
         case disgusted = "disgusted"
         case surprised = "surprised"
     }
+}
+
+// MARK: - Danger Dismissed Data
+
+/// 위험 상황 해제 데이터
+struct DangerDismissedData: Codable, Sendable {
+    /// 원래 알림 타입 (device_fall, person_fall, loud_voice 등)
+    let originalAlertType: String
+
+    /// 해제 주체 (user, timeout 등)
+    let dismissedBy: String
+
+    /// 알림부터 해제까지 걸린 시간 (ms)
+    let responseTimeMs: Int64?
+}
+
+// MARK: - Request Fall Confirmation Data (Agent → iOS)
+
+/// Agent가 낙상 확인 Alert 표시 요청 데이터
+struct RequestFallConfirmationData: Codable, Sendable {
+    /// 원래 낙상 알림 타입 (device_fall, person_fall)
+    let originalAlertType: String
+
+    /// Agent가 질문한 횟수
+    let askCount: Int
+
+    /// 질문부터 타임아웃까지 걸린 시간 (초)
+    let timeoutSeconds: Float?
+
+    /// 추가 메시지 (선택사항)
+    let message: String?
+}
+
+// MARK: - Emergency Confirmed Data (Agent → iOS)
+
+/// Agent가 긴급 상황 확정 데이터 (보호자 알림 필요)
+struct EmergencyConfirmedData: Codable, Sendable {
+    /// 긴급 상황 유형
+    let emergencyType: EmergencyType
+
+    /// 원래 감지 타입 (device_fall, person_fall, loud_voice)
+    let originalAlertType: String
+
+    /// 긴급 상황 확정 사유
+    let reason: ConfirmationReason
+
+    /// 보호자에게 전달할 메시지
+    let messageForGuardian: String?
+
+    enum EmergencyType: String, Codable, Sendable {
+        /// 낙상 응급
+        case fall = "fall"
+        /// 호출 응급 (도움 요청)
+        case callForHelp = "call_for_help"
+        /// 기타 응급
+        case other = "other"
+    }
+
+    enum ConfirmationReason: String, Codable, Sendable {
+        /// 사용자가 "도움이 필요해요" 선택
+        case userRequested = "user_requested"
+        /// 응답 없음 타임아웃
+        case noResponse = "no_response"
+        /// Agent 판단
+        case agentDecision = "agent_decision"
+    }
+}
+
+// MARK: - Alert Response (Agent → iOS)
+
+/// Agent가 iOS에 보내는 알림 응답 (alert_response 토픽)
+struct AlertResponse: Codable, Sendable {
+    /// 알림 타입 (device_fall, person_fall, loud_voice, emotion)
+    let alertType: String
+
+    /// 심각도 (low, medium, high, critical)
+    let severity: String
+
+    /// Agent의 음성 응답 메시지
+    let agentResponse: String
+
+    /// 타임스탬프 (Unix milliseconds)
+    let timestamp: Int64
+
+    /// DataChannel topic
+    static let topic = "alert_response"
 }
 
 // MARK: - DataChannel Constants

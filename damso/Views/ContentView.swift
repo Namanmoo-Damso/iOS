@@ -576,6 +576,9 @@ struct ContentView: View {
         guard let call = callStateStore.activeCall else { return }
         Log.ui.i("수신 통화 수락 - handle: \(call.handle)")
 
+        // ⚠️ 중요: 먼저 벨소리를 중지해야 오디오 세션 충돌 방지
+        RingtonePlayer.shared.stopRinging()
+
         let isForeground = UIApplication.shared.applicationState == .active
 
         // Foreground에서는 이미 CallKit을 종료했으므로 직접 통화 시작
@@ -585,10 +588,15 @@ struct ContentView: View {
             Log.ui.i("직접 통화 시작 (foreground=\(isForeground))")
             callStateStore.clearCall()
             showGlobalCallView = true
-            if let roomName = call.roomName {
-                callViewModel.startCall(roomName: roomName)
-            } else {
-                callViewModel.startCall()
+
+            // 오디오 세션이 안정화될 시간을 위해 약간의 딜레이 후 통화 시작
+            Task {
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1초
+                if let roomName = call.roomName {
+                    callViewModel.startCall(roomName: roomName)
+                } else {
+                    callViewModel.startCall()
+                }
             }
         } else {
             // Background + CallKit: answerCall → setAnswered → onChange에서 showGlobalCallView = true
@@ -600,6 +608,9 @@ struct ContentView: View {
     private func declineIncomingCall() {
         guard let call = callStateStore.activeCall else { return }
         Log.ui.i("수신 통화 거절 - handle: \(call.handle)")
+
+        // 벨소리 중지
+        RingtonePlayer.shared.stopRinging()
 
         let isForeground = UIApplication.shared.applicationState == .active
 

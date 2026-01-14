@@ -232,8 +232,9 @@ final class LiveKitService: NSObject, ObservableObject, LiveKitServiceProtocol {
         debugLog("🔌 [CONNECT] SensorAggregator started")
 
         // 케어 알림 서비스 시작 (낙상/음성/감정 알림)
-        careAlertService.start(room: room)
-        debugLog("🔌 [CONNECT] CareAlertService started")
+        let wardId = room.localParticipant.identity?.stringValue
+        careAlertService.start(room: room, wardId: wardId)
+        debugLog("🔌 [CONNECT] CareAlertService started (wardId: \(wardId ?? "unknown"))")
 
         // 사용자 음성 레벨 모니터링 시작
         if let localAudioTrack = room.localParticipant.localAudioTracks.first?.track as? LocalAudioTrack {
@@ -617,6 +618,11 @@ extension LiveKitService: RoomDelegate {
                 debugLog("🏥 Care alert received from \(identity ?? "unknown")")
                 handleCareAlert(data, from: identity)
 
+            case AlertResponse.topic:
+                // Agent 알림 응답 수신 → iOS Alert 표시
+                debugLog("📢 Alert response received from \(identity ?? "unknown")")
+                handleAlertResponse(data, from: identity)
+
             default:
                 debugLog("📦 Unknown topic data: \(topic)")
             }
@@ -639,6 +645,22 @@ extension LiveKitService: RoomDelegate {
             }
         } catch {
             debugLog("🚨 Failed to decode alert event: \(error)")
+        }
+    }
+
+    /// Agent 알림 응답 처리 (alert_response 토픽)
+    /// Agent가 TTS 출력과 함께 iOS에 Alert 표시 요청
+    private func handleAlertResponse(_ data: Data, from identity: String?) {
+        do {
+            let response = try JSONDecoder().decode(AlertResponse.self, from: data)
+            debugLog("📢 AlertResponse: type=\(response.alertType), severity=\(response.severity)")
+            debugLog("📢 Agent says: \(response.agentResponse)")
+
+            // CareAlertService에 전달하여 iOS Alert 표시
+            careAlertService.handleAlertResponse(response)
+
+        } catch {
+            debugLog("📢 Failed to decode alert response: \(error)")
         }
     }
 
@@ -668,6 +690,25 @@ extension LiveKitService: RoomDelegate {
                     object: nil,
                     userInfo: ["alert": alert, "from": identity ?? "unknown"]
                 )
+            case .dangerDismissed:
+                // 서버에서 위험 해제 확인 응답 (현재 iOS에서는 별도 처리 불필요)
+                debugLog("🏥 Danger dismissed acknowledged by server")
+
+            // MARK: - Agent → iOS 요청 처리
+
+            case .requestFallConfirmation:
+                // Agent가 음성 질문 후 응답 없을 때 iOS Alert 표시 요청
+                debugLog("📱 Agent requested fall confirmation alert")
+                if case .requestFallConfirmation(let requestData) = alert.data {
+                    careAlertService.handleFallConfirmationRequest(requestData)
+                }
+
+            case .emergencyConfirmed:
+                // Agent가 긴급 상황 확정 → 보호자 알림
+                debugLog("🚨 Agent confirmed emergency, notifying guardian")
+                if case .emergencyConfirmed(let emergencyData) = alert.data {
+                    careAlertService.handleEmergencyConfirmed(emergencyData)
+                }
             }
         } catch {
             debugLog("🏥 Failed to decode care alert: \(error)")
@@ -689,5 +730,8 @@ extension Notification.Name {
 
     /// 케어 알림 - 감정 분석
     static let careAlertEmotionReceived = Notification.Name("careAlertEmotionReceived")
+
+    /// 긴급 알림 발생 (보호자 알림용)
+    static let emergencyAlertTriggered = Notification.Name("emergencyAlertTriggered")
 }
 #endif

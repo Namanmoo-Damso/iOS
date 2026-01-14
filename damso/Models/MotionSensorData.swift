@@ -153,9 +153,9 @@ extension MotionSensorData {
     /// 자유 낙하 감지 임계값 (g 단위, 0에 가까움)
     static let freefallThreshold: Float = 0.3
 
-    /// 충격 감지 임계값 (g 단위)
+    /// 충격 감지 임계값 (g 단위) - 낮춤 (기존 4.5 → 2.5)
     static let impactThreshold: Float = 2.5
 
-    /// 회전 속도 임계값 (rad/s)
+    /// 회전 속도 임계값 (rad/s) - 낮춤 (기존 5.0 → 3.0)
     static let rotationThreshold: Float = 3.0
 }

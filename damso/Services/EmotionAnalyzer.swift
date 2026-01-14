@@ -50,10 +50,10 @@ final class EmotionAnalyzer: ObservableObject {
     var analysisInterval: Float = 3.0
 
     /// 최소 신뢰도 (이 이상이어야 알림 전송)
-    var minimumConfidence: Float = 0.6
+    var minimumConfidence: Float = 0.5
 
     /// 부정적 감정만 알림 전송 여부
-    var onlyNegativeEmotions: Bool = true
+    var onlyNegativeEmotions: Bool = false
 
     // MARK: - Private Properties
 
@@ -350,7 +350,7 @@ final class EmotionAnalyzer: ObservableObject {
         let shouldSendAlert = confidence >= minimumConfidence &&
             (!onlyNegativeEmotions || isNegativeEmotion(emotion))
 
-        if shouldSendAlert && emotion != .neutral {
+        if shouldSendAlert {
             sendEmotionAlert(
                 emotion: emotion,
                 confidence: confidence,
