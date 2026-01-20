@@ -44,6 +44,27 @@ protocol MotionSensorProtocol: AnyObject {
     func setFallDetectionEnabled(_ enabled: Bool)
 }
 
+/// 낙상 위험 수준
+enum FallRiskLevel: String, Codable, Sendable {
+    /// 정상 (위험도 0.5 미만)
+    case normal = "normal"
+    /// 주의 (위험도 0.5 이상 0.7 미만)
+    case caution = "caution"
+    /// 위급 (위험도 0.7 이상)
+    case critical = "critical"
+
+    /// 위험도 값에서 레벨 계산
+    static func from(risk: Float) -> FallRiskLevel {
+        if risk >= 0.7 {
+            return .critical
+        } else if risk >= 0.5 {
+            return .caution
+        } else {
+            return .normal
+        }
+    }
+}
+
 /// 낙상 감지 이벤트
 struct FallEvent: Codable, Sendable {
     /// 이벤트 타임스탬프
@@ -58,6 +79,12 @@ struct FallEvent: Codable, Sendable {
     /// 이벤트 발생 전 센서 데이터 스냅샷
     let sensorSnapshot: MotionSensorData?
 
+    /// 위험 수준 (normal/caution/critical)
+    let riskLevel: FallRiskLevel
+
+    /// 위험도 점수 (0.0 ~ 1.0)
+    let riskScore: Float
+
     enum FallType: String, Codable, Sendable {
         case freefall      // 자유 낙하 감지
         case impact        // 충격 감지
@@ -65,11 +92,13 @@ struct FallEvent: Codable, Sendable {
         case rapidPostureChange  // 급격한 자세 변화
     }
 
-    init(type: FallType, impactMagnitude: Float, sensorSnapshot: MotionSensorData? = nil) {
+    init(type: FallType, impactMagnitude: Float, sensorSnapshot: MotionSensorData? = nil, riskScore: Float = 1.0) {
         self.timestamp = Int64(Date().timeIntervalSince1970 * 1000)
         self.type = type
         self.impactMagnitude = impactMagnitude
         self.sensorSnapshot = sensorSnapshot
+        self.riskScore = riskScore
+        self.riskLevel = FallRiskLevel.from(risk: riskScore)
     }
 }
 

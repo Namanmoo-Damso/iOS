@@ -40,6 +40,9 @@ final class CareAlertService: ObservableObject {
     /// 현재 낙상 이벤트 (확인 대기 중)
     @Published private(set) var currentFallEvent: FallEvent?
 
+    /// 현재 Alert ID (Agent에서 받은 값, acknowledge_alert 응답 시 사용)
+    @Published private(set) var currentAlertId: String?
+
     /// Alert 메시지 (알림 타입별)
     var alertMessage: String {
         switch currentAlertType {
@@ -51,6 +54,10 @@ final class CareAlertService: ObservableObject {
             return "얼굴이 보이지 않습니다.\n상태를 알려주세요."
         case .loudVoice:
             return "큰 소리가 감지되었습니다.\n상태를 알려주세요."
+        case .emotion:
+            return "감정 변화가 감지되었습니다.\n상태를 알려주세요."
+        case .speechKeyword:
+            return "감정 변화가 감지되었습니다.\n상태를 알려주세요."
         }
     }
 
@@ -60,6 +67,8 @@ final class CareAlertService: ObservableObject {
         case personFallRapidDescent
         case personFallFaceDisappeared
         case loudVoice
+        case emotion
+        case speechKeyword
     }
 
     /// 낙상 감지 시간 (responseTime 계산용)
@@ -76,6 +85,13 @@ final class CareAlertService: ObservableObject {
 
     /// Ward ID (서버 전송용)
     private var wardId: String = "unknown"
+
+    // MARK: - Configuration
+
+    /// 임계값 기반 알림 사용 여부
+    /// false로 설정 시 iOS에서 자동 알림을 보내지 않고, SensorStreamService가 원시 데이터를 전송하여 Agent가 판단
+    /// true로 설정 시 기존 방식대로 iOS에서 임계값 초과 시 자동 알림 전송
+    var useThresholdBasedAlerts: Bool = false
 
     // MARK: - Private Properties
 
@@ -148,7 +164,9 @@ final class CareAlertService: ObservableObject {
             impactMagnitude: impactMagnitude,
             fallType: fallType,
             freefallDuration: freefallDuration,
-            maxRotationRate: maxRotationRate
+            maxRotationRate: maxRotationRate,
+            riskLevel: nil,
+            riskScore: nil
         )
 
         let severity: CareAlertSeverity = impactMagnitude > 3.0 ? .critical : .high
@@ -160,6 +178,66 @@ final class CareAlertService: ObservableObject {
         )
 
         try await sendToDataChannel(payload)
+    }
+
+    /// 기기 낙상 알림 전송 (위험도 레벨 포함)
+    /// - Parameters:
+    ///   - impactMagnitude: 충격 크기 (g 단위)
+    ///   - fallType: 낙상 유형
+    ///   - riskLevel: 위험도 레벨 (normal/caution/critical)
+    ///   - riskScore: 위험도 점수 (0.0 ~ 1.0)
+    ///   - freefallDuration: 낙하 전 자유낙하 시간 (초)
+    ///   - maxRotationRate: 최대 회전 속도 (rad/s)
+    func sendDeviceFallAlertWithRiskLevel(
+        impactMagnitude: Float,
+        fallType: DeviceFallAlertData.DeviceFallType,
+        riskLevel: FallRiskLevel,
+        riskScore: Float,
+        freefallDuration: Float? = nil,
+        maxRotationRate: Float? = nil
+    ) async throws {
+        // FallRiskLevel → DeviceFallAlertData.DeviceFallRiskLevel 변환
+        let dataRiskLevel: DeviceFallAlertData.DeviceFallRiskLevel
+        switch riskLevel {
+        case .normal:
+            dataRiskLevel = .normal
+        case .caution:
+            dataRiskLevel = .caution
+        case .critical:
+            dataRiskLevel = .critical
+        }
+
+        let data = DeviceFallAlertData(
+            impactMagnitude: impactMagnitude,
+            fallType: fallType,
+            freefallDuration: freefallDuration,
+            maxRotationRate: maxRotationRate,
+            riskLevel: dataRiskLevel,
+            riskScore: riskScore
+        )
+
+        // 위험도 레벨에 따른 심각도 설정
+        // critical → .critical (긴급)
+        // caution → .medium (주의)
+        // normal → .low (정상) - 실제로는 normal은 전송하지 않음
+        let severity: CareAlertSeverity
+        switch riskLevel {
+        case .critical:
+            severity = .critical
+        case .caution:
+            severity = .medium
+        case .normal:
+            severity = .low
+        }
+
+        let payload = CareAlertPayload(
+            alertType: .deviceFall,
+            severity: severity,
+            data: .deviceFall(data)
+        )
+
+        try await sendToDataChannel(payload)
+        debugLog("📤 Device fall alert sent: riskLevel=\(riskLevel), riskScore=\(String(format: "%.2f", riskScore)), severity=\(severity)")
     }
 
     /// 사람 낙상 알림 전송
@@ -259,7 +337,14 @@ final class CareAlertService: ObservableObject {
     // MARK: - Private Methods
 
     private func setupSubscriptions() {
-        // 1. 기기 낙상 감지 구독
+        // 임계값 기반 알림이 비활성화된 경우 자동 알림 구독 건너뛰기
+        // SensorStreamService가 원시 데이터를 전송하고 Agent가 판단
+        guard useThresholdBasedAlerts else {
+            debugLog("⚙️ Threshold-based alerts disabled - skipping subscriptions (SensorStreamService will send raw data)")
+            return
+        }
+
+        // 1. 기기 낙상 감지 구독 (임계값 기반)
         motionSensorService.fallDetectedStream
             .sink { [weak self] fallEvent in
                 Task { @MainActor in
@@ -268,13 +353,13 @@ final class CareAlertService: ObservableObject {
             }
             .store(in: &cancellables)
 
-        debugLog("Subscriptions setup complete")
+        debugLog("✅ Threshold-based subscriptions setup complete")
     }
 
     /// 기기 낙상 이벤트 처리
     /// Agent에게만 알림 전송 (iOS Alert은 Agent의 request_fall_confirmation 요청 시 표시)
     private func handleDeviceFallEvent(_ event: FallEvent) async {
-        debugLog("⚠️ Device fall detected: \(event.type)")
+        debugLog("⚠️ Device fall detected: \(event.type), riskLevel: \(event.riskLevel), riskScore: \(event.riskScore)")
 
         // 쿨다운 체크 - 이미 Alert이 표시 중이거나 최근에 알림을 보냈으면 무시
         let timeSinceLastAlert = Date().timeIntervalSince(lastFallAlertTime)
@@ -283,17 +368,18 @@ final class CareAlertService: ObservableObject {
             return
         }
 
-        // 현재 이벤트 저장 (Agent 요청 시 Alert 표시용)
-        // ⚠️ 중요: Alert은 Agent의 request_fall_confirmation 요청이 오면 표시
-        Task { @MainActor in
-            self.objectWillChange.send()
-            self.currentFallEvent = event
-            self.fallDetectedTime = Date()
-            self.lastFallAlertTime = Date()
-            // showFallConfirmationAlert = true 제거됨
-            // → Agent가 음성 질문 후 응답 없으면 request_fall_confirmation 전송
-            // → 그때 showFallConfirmationAlert = true 설정
-            debugLog("⚠️ Fall event stored, waiting for Agent's confirmation request")
+        // 위급(critical) 단계만 Alert 표시 대기
+        // 주의(caution) 단계는 Agent에게 알림만 전송하고 Alert은 표시하지 않음
+        if event.riskLevel == .critical {
+            Task { @MainActor in
+                self.objectWillChange.send()
+                self.currentFallEvent = event
+                self.fallDetectedTime = Date()
+                self.lastFallAlertTime = Date()
+                debugLog("🚨 CRITICAL fall event stored, waiting for Agent's confirmation request")
+            }
+        } else {
+            debugLog("⚠️ CAUTION level - sending to Agent without Alert")
         }
 
         let fallType: DeviceFallAlertData.DeviceFallType
@@ -309,13 +395,15 @@ final class CareAlertService: ObservableObject {
         }
 
         do {
-            try await sendDeviceFallAlert(
+            try await sendDeviceFallAlertWithRiskLevel(
                 impactMagnitude: event.impactMagnitude,
                 fallType: fallType,
+                riskLevel: event.riskLevel,
+                riskScore: event.riskScore,
                 freefallDuration: nil,
                 maxRotationRate: nil
             )
-            debugLog("✅ Fall alert sent to Agent, waiting for alert_response...")
+            debugLog("✅ Fall alert sent to Agent (riskLevel: \(event.riskLevel)), waiting for alert_response...")
         } catch {
             debugLog("Failed to send device fall alert: \(error)")
         }
@@ -344,11 +432,11 @@ final class CareAlertService: ObservableObject {
         // Alert 숨기기
         showFallConfirmationAlert = false
 
-        // 서버에 acknowledge_alert 전송
+        // Agent에게 acknowledge_alert 전송 (response: "ok")
         Task {
             do {
-                try await sendAcknowledgeAlert()
-                debugLog("✅ Danger dismissed by user (acknowledge_alert sent)")
+                try await sendAcknowledgeAlert(response: .ok)
+                debugLog("✅ Danger dismissed by user (response: ok)")
             } catch {
                 debugLog("Failed to send acknowledge alert: \(error)")
             }
@@ -360,21 +448,32 @@ final class CareAlertService: ObservableObject {
         lastFallAlertTime = .distantPast  // 쿨다운 리셋 - 바로 다음 낙상 감지 가능
     }
 
-    /// 위험 해제 신호 전송 (acknowledge_alert topic)
-    func sendAcknowledgeAlert() async throws {
+    /// 사용자 응답 타입 (acknowledge_alert용)
+    enum AcknowledgeResponse: String {
+        case ok = "ok"              // "괜찮아요" 버튼
+        case needHelp = "need_help" // "도움이 필요해요" 버튼
+    }
+
+    /// 사용자 응답 전송 (acknowledge_alert topic)
+    /// - Parameter response: "ok" (괜찮아요) 또는 "need_help" (도움이 필요해요)
+    func sendAcknowledgeAlert(response: AcknowledgeResponse) async throws {
         #if canImport(LiveKit)
         guard let room, room.connectionState == .connected else {
             debugLog("Room not connected, skipping acknowledge send")
             return
         }
 
-        // wardId 사용
-        let wardIdToSend = self.wardId
+        guard let alertId = currentAlertId else {
+            debugLog("⚠️ No alertId available, skipping acknowledge send")
+            return
+        }
 
-        // Payload 생성
+        // Payload 생성 (명세에 맞게)
         let payload: [String: Any] = [
-            "timestamp": Int64(Date().timeIntervalSince1970 * 1000),
-            "wardId": wardIdToSend
+            "alertId": alertId,
+            "wardId": wardId,
+            "response": response.rawValue,
+            "timestamp": Int64(Date().timeIntervalSince1970 * 1000)
         ]
 
         let jsonData = try JSONSerialization.data(withJSONObject: payload)
@@ -389,7 +488,7 @@ final class CareAlertService: ObservableObject {
             return
         }
 
-        // Agent에게 reliable 전송 (새 topic)
+        // Agent에게 reliable 전송
         let options = DataPublishOptions(
             destinationIdentities: [agentIdentity],
             topic: "acknowledge_alert",
@@ -397,7 +496,10 @@ final class CareAlertService: ObservableObject {
         )
 
         try await room.localParticipant.publish(data: jsonData, options: options)
-        debugLog("✅ Sent acknowledge_alert to \(agentIdentity) (wardId: \(wardId))")
+        debugLog("✅ Sent acknowledge_alert to \(agentIdentity) (alertId: \(alertId), response: \(response.rawValue))")
+
+        // 상태 초기화
+        currentAlertId = nil
         #endif
     }
 
@@ -406,7 +508,10 @@ final class CareAlertService: ObservableObject {
     /// Agent 알림 응답 처리 (alert_response 토픽)
     /// Agent가 TTS 출력 후 iOS에 Alert 표시 요청
     func handleAlertResponse(_ response: AlertResponse) {
-        debugLog("📢 Received alert_response: type=\(response.alertType), severity=\(response.severity)")
+        debugLog("📢 Received alert_response: alertId=\(response.alertId), type=\(response.alertType), riskLevel=\(response.riskLevel?.rawValue ?? "unknown")")
+
+        // alertId 저장 (acknowledge_alert 응답 시 사용)
+        currentAlertId = response.alertId
 
         // 알림 타입 설정 (메시지 표시용)
         switch response.alertType {
@@ -417,6 +522,10 @@ final class CareAlertService: ObservableObject {
             currentAlertType = lastPersonFallType
         case "loud_voice":
             currentAlertType = .loudVoice
+        case "emotion":
+            currentAlertType = .emotion
+        case "speech_keyword":
+            currentAlertType = .speechKeyword
         default:
             currentAlertType = .deviceFall
         }
@@ -424,7 +533,7 @@ final class CareAlertService: ObservableObject {
         // iOS Alert 표시
         showFallAlertIfNeeded()
 
-        debugLog("⚠️ Alert displayed (triggered by Agent response, type: \(currentAlertType))")
+        debugLog("⚠️ Alert displayed (alertId: \(response.alertId), riskLevel: \(response.riskLevel?.rawValue ?? "unknown"), type: \(currentAlertType))")
     }
 
     // MARK: - Agent Request Handlers
@@ -455,23 +564,15 @@ final class CareAlertService: ObservableObject {
         // Alert 숨기기
         showFallConfirmationAlert = false
 
-        // Agent에게 도움 요청 알림 전송
+        // Agent에게 acknowledge_alert 전송 (response: "need_help")
+        // Agent가 서버의 /v1/guardians/alerts/:alertId/escalate 호출하여 격상 처리
         Task {
             do {
-                try await sendHelpRequestToAgent()
-                debugLog("✅ Help request sent to Agent")
+                try await sendAcknowledgeAlert(response: .needHelp)
+                debugLog("✅ Help request sent to Agent (response: need_help)")
             } catch {
                 debugLog("Failed to send help request: \(error)")
             }
-
-            // 보호자에게 긴급 알림 전송
-            let emergencyData = EmergencyConfirmedData(
-                emergencyType: .fall,
-                originalAlertType: "device_fall",
-                reason: .userRequested,
-                messageForGuardian: "어르신이 도움을 요청했습니다"
-            )
-            await sendEmergencyAlertToGuardian(emergencyData)
         }
 
         // 상태 초기화

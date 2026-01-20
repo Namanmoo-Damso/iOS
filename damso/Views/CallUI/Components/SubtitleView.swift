@@ -166,25 +166,3 @@ struct CompactSubtitleView: View {
         }
     }
 }
-
-#Preview("Subtitle History View") {
-    ZStack {
-        Color(hex: "1C1C1E")
-
-        VStack {
-            Spacer()
-
-            SubtitleHistoryView(
-                messages: [
-                    SubtitleMessage(text: "안녕하세요, 무엇을 도와드릴까요?", isAgent: true, timestamp: Date(), isFinal: true),
-                    SubtitleMessage(text: "오늘 날씨 알려줘", isAgent: false, timestamp: Date(), isFinal: true),
-                    SubtitleMessage(text: "오늘 서울 날씨는 맑고 기온은 영하 2도입니다.", isAgent: true, timestamp: Date(), isFinal: true),
-                    SubtitleMessage(text: "고마워", isAgent: false, timestamp: Date(), isFinal: true)
-                ],
-                currentAgentText: "네, 또 궁금한 것이 있으시면",
-                currentUserText: ""
-            )
-            .padding(.bottom, 100)
-        }
-    }
-}

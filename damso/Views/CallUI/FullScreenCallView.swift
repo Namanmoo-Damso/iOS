@@ -28,6 +28,9 @@ struct FullScreenCallView: View {
     @State private var isPIPExpanded: Bool = false
     @State private var showPIPMesh: Bool = false
 
+    // AI 발화 상태 (TranscriptionManager에서 동기화)
+    @State private var isAISpeaking: Bool = false
+
     let onDismiss: () -> Void
 
     init(viewModel: AppLiveKitViewModel, onDismiss: @escaping () -> Void) {
@@ -72,7 +75,7 @@ struct FullScreenCallView: View {
                     // 좌상단 - 듣는중/말하는중 상태 (AI 모드일 때만)
                     if isAudioOnlyMode {
                         HStack {
-                            SpeakingStatusIndicator(status: transcription.isAISpeaking ? .talking : .listening)
+                            SpeakingStatusIndicator(status: isAISpeaking ? .talking : .listening)
                                 .padding(.leading, 16)
                                 .padding(.top, 8)
                             Spacer()
@@ -115,12 +118,15 @@ struct FullScreenCallView: View {
 
                 // AI 대사 (음성통화 모드일 때)
                 if isAudioOnlyMode && !aiDisplayText.isEmpty {
-                    AIChatBubbleView(
-                        text: aiDisplayText,
-                        isFinal: transcription.currentAgentText.isEmpty
-                    )
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 16)
+                    GeometryReader { geo in
+                        AIChatBubbleView(
+                            text: aiDisplayText,
+                            isFinal: transcription.currentAgentText.isEmpty
+                        )
+                        .padding(.horizontal, geo.size.width * 0.04)
+                        .padding(.bottom, geo.size.height * 0.02)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                    }
                 }
 
                 bottomOverlay
@@ -244,9 +250,17 @@ struct FullScreenCallView: View {
             if viewModel.isConnected {
                 startCallTimer()
             }
+            // 초기값 동기화
+            isAISpeaking = transcription.isAISpeaking
         }
         .onDisappear {
             stopCallTimer()
+        }
+        .onReceive(transcription.$isAISpeaking) { newValue in
+            #if DEBUG
+            print("🎬 [UI] onReceive isAISpeaking: \(newValue)")
+            #endif
+            isAISpeaking = newValue
         }
     }
 
@@ -347,14 +361,15 @@ struct FullScreenCallView: View {
             GeometryReader { geometry in
                 let videoWidth = geometry.size.width * 0.95
                 let videoHeight = videoWidth / (896.0 / 1024.0)
-                // dock(80) + 말풍선 여유(120) + safe area 대략(34)
-                let bottomPadding: CGFloat = 234
+                // iPad mini 6th gen 기준 비율 (234/1133 ≈ 0.206)
+                // dock + 말풍선 여유 + safe area를 상대값으로 계산
+                let bottomPadding = geometry.size.height * 0.206
 
                 ZStack {
                     Color(hex: "E8E4DF")
                     VStack(spacing: 0) {
                         Spacer()
-                        DualStateVideoPlayer(isAISpeaking: transcription.isAISpeaking)
+                        DualStateVideoPlayer(isAISpeaking: isAISpeaking)
                             .frame(width: videoWidth, height: videoHeight)
                             .clipped()
                     }

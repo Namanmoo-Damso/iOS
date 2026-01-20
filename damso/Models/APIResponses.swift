@@ -869,6 +869,269 @@ struct TriggerEmergencyRequest: Codable {
     let accuracy: Double?
 }
 
+// MARK: - 통화 분석 응답
+
+/// POST /v1/calls/:callId/analyze 응답
+struct CallAnalyzeResponse: Codable {
+    let callId: String
+    let status: String
+    let analysis: CallAnalysis?
+
+    enum CodingKeys: String, CodingKey {
+        case callId
+        case status
+        case analysis
+    }
+
+    private enum SnakeCaseCodingKeys: String, CodingKey {
+        case callId = "call_id"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let snakeContainer = try decoder.container(keyedBy: SnakeCaseCodingKeys.self)
+
+        // callId
+        if let id = try? container.decode(String.self, forKey: .callId) {
+            callId = id
+        } else {
+            callId = try snakeContainer.decode(String.self, forKey: .callId)
+        }
+
+        status = try container.decode(String.self, forKey: .status)
+        analysis = try? container.decode(CallAnalysis.self, forKey: .analysis)
+    }
+}
+
+/// 통화 분석 결과
+struct CallAnalysis: Codable {
+    let sentiment: String?
+    let summary: String?
+    let keywords: [String]?
+    let emotionScores: [String: Double]?
+
+    enum CodingKeys: String, CodingKey {
+        case sentiment
+        case summary
+        case keywords
+        case emotionScores
+    }
+
+    private enum SnakeCaseCodingKeys: String, CodingKey {
+        case emotionScores = "emotion_scores"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let snakeContainer = try decoder.container(keyedBy: SnakeCaseCodingKeys.self)
+
+        sentiment = try? container.decode(String.self, forKey: .sentiment)
+        summary = try? container.decode(String.self, forKey: .summary)
+        keywords = try? container.decode([String].self, forKey: .keywords)
+
+        // emotionScores
+        if let scores = try? container.decode([String: Double].self, forKey: .emotionScores) {
+            emotionScores = scores
+        } else {
+            emotionScores = try? snakeContainer.decode([String: Double].self, forKey: .emotionScores)
+        }
+    }
+}
+
+// MARK: - 방 컨텍스트 응답
+
+/// GET /v1/calls/room/:roomName/context 응답
+struct RoomContextResponse: Codable {
+    let roomName: String
+    let callId: String?
+    let participants: [RoomParticipant]?
+    let state: String?
+    let createdAt: String?
+    let metadata: RoomMetadata?
+
+    enum CodingKeys: String, CodingKey {
+        case roomName
+        case callId
+        case participants
+        case state
+        case createdAt
+        case metadata
+    }
+
+    private enum SnakeCaseCodingKeys: String, CodingKey {
+        case roomName = "room_name"
+        case callId = "call_id"
+        case createdAt = "created_at"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let snakeContainer = try decoder.container(keyedBy: SnakeCaseCodingKeys.self)
+
+        // roomName
+        if let name = try? container.decode(String.self, forKey: .roomName) {
+            roomName = name
+        } else {
+            roomName = try snakeContainer.decode(String.self, forKey: .roomName)
+        }
+
+        // callId
+        if let id = try? container.decode(String.self, forKey: .callId) {
+            callId = id
+        } else {
+            callId = try? snakeContainer.decode(String.self, forKey: .callId)
+        }
+
+        participants = try? container.decode([RoomParticipant].self, forKey: .participants)
+        state = try? container.decode(String.self, forKey: .state)
+
+        // createdAt
+        if let date = try? container.decode(String.self, forKey: .createdAt) {
+            createdAt = date
+        } else {
+            createdAt = try? snakeContainer.decode(String.self, forKey: .createdAt)
+        }
+
+        metadata = try? container.decode(RoomMetadata.self, forKey: .metadata)
+    }
+}
+
+/// 방 참가자 정보
+struct RoomParticipant: Codable {
+    let identity: String
+    let name: String?
+    let joinedAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case identity
+        case name
+        case joinedAt
+    }
+
+    private enum SnakeCaseCodingKeys: String, CodingKey {
+        case joinedAt = "joined_at"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let snakeContainer = try decoder.container(keyedBy: SnakeCaseCodingKeys.self)
+
+        identity = try container.decode(String.self, forKey: .identity)
+        name = try? container.decode(String.self, forKey: .name)
+
+        // joinedAt
+        if let date = try? container.decode(String.self, forKey: .joinedAt) {
+            joinedAt = date
+        } else {
+            joinedAt = try? snakeContainer.decode(String.self, forKey: .joinedAt)
+        }
+    }
+}
+
+/// 방 메타데이터
+struct RoomMetadata: Codable {
+    let callerIdentity: String?
+    let calleeIdentity: String?
+    let callType: String?
+
+    enum CodingKeys: String, CodingKey {
+        case callerIdentity
+        case calleeIdentity
+        case callType
+    }
+
+    private enum SnakeCaseCodingKeys: String, CodingKey {
+        case callerIdentity = "caller_identity"
+        case calleeIdentity = "callee_identity"
+        case callType = "call_type"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let snakeContainer = try decoder.container(keyedBy: SnakeCaseCodingKeys.self)
+
+        // callerIdentity
+        if let caller = try? container.decode(String.self, forKey: .callerIdentity) {
+            callerIdentity = caller
+        } else {
+            callerIdentity = try? snakeContainer.decode(String.self, forKey: .callerIdentity)
+        }
+
+        // calleeIdentity
+        if let callee = try? container.decode(String.self, forKey: .calleeIdentity) {
+            calleeIdentity = callee
+        } else {
+            calleeIdentity = try? snakeContainer.decode(String.self, forKey: .calleeIdentity)
+        }
+
+        // callType
+        if let type = try? container.decode(String.self, forKey: .callType) {
+            callType = type
+        } else {
+            callType = try? snakeContainer.decode(String.self, forKey: .callType)
+        }
+    }
+}
+
+// MARK: - 방 전사 내역 응답
+
+/// GET /v1/calls/room/:roomName/transcripts 응답
+struct RoomTranscriptsResponse: Codable {
+    let roomName: String
+    let transcripts: [TranscriptEntry]
+
+    enum CodingKeys: String, CodingKey {
+        case roomName
+        case transcripts
+    }
+
+    private enum SnakeCaseCodingKeys: String, CodingKey {
+        case roomName = "room_name"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let snakeContainer = try decoder.container(keyedBy: SnakeCaseCodingKeys.self)
+
+        // roomName
+        if let name = try? container.decode(String.self, forKey: .roomName) {
+            roomName = name
+        } else {
+            roomName = try snakeContainer.decode(String.self, forKey: .roomName)
+        }
+
+        transcripts = (try? container.decode([TranscriptEntry].self, forKey: .transcripts)) ?? []
+    }
+}
+
+/// 전사 내역 엔트리
+struct TranscriptEntry: Codable, Identifiable {
+    let id: String
+    let speaker: String
+    let text: String
+    let timestamp: String
+    let confidence: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case speaker
+        case text
+        case timestamp
+        case confidence
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        // id가 없을 경우 UUID 생성
+        id = (try? container.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        speaker = try container.decode(String.self, forKey: .speaker)
+        text = try container.decode(String.self, forKey: .text)
+        timestamp = try container.decode(String.self, forKey: .timestamp)
+        confidence = try? container.decode(Double.self, forKey: .confidence)
+    }
+}
+
 // MARK: - JSON Decoder Helper
 
 extension JSONDecoder {

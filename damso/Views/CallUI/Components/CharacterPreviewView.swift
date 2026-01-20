@@ -221,12 +221,3 @@ private struct PreviewBottomHeightKey: PreferenceKey {
 }
 
 // MARK: - Preview
-
-#Preview("Character Preview - iPad mini") {
-    CharacterPreviewView()
-}
-
-#Preview("Character Preview - iPhone") {
-    CharacterPreviewView()
-        .frame(width: 393, height: 852)
-}

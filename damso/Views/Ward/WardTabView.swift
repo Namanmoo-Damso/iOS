@@ -292,8 +292,3 @@ struct WardHomeTabContent: View {
         )
     }
 }
-
-#Preview {
-    WardTabView()
-        .environmentObject(AppState())
-}

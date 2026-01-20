@@ -76,23 +76,3 @@ struct AlertCard: View {
         )
     }
 }
-
-#Preview {
-    VStack(spacing: 12) {
-        AlertCard(alert: DashboardAlert(
-            id: "1",
-            type: .warning,
-            message: "3일 연속 통증 관련 단어가 감지되었습니다",
-            date: "2024-12-24"
-        ))
-
-        AlertCard(alert: DashboardAlert(
-            id: "2",
-            type: .info,
-            message: "대화 빈도가 지난주 대비 증가했습니다",
-            date: "2024-12-23"
-        ))
-    }
-    .padding()
-    .background(Color(.systemGroupedBackground))
-}

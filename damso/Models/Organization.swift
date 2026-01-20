@@ -37,16 +37,3 @@ struct Organization: Codable, Identifiable, Equatable {
         return lhs.id == rhs.id
     }
 }
-
-// MARK: - Mock Data (테스트용)
-
-#if DEBUG
-extension Organization {
-    static let mock = Organization(
-        id: "org-uuid-001",
-        name: "행복요양원",
-        phoneNumber: "02-1234-5678",
-        address: "서울특별시 강남구 테헤란로 123"
-    )
-}
-#endif

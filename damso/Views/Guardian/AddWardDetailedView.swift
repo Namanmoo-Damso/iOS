@@ -36,8 +36,3 @@ struct AddWardDetailedView: View {
         .environmentObject(appState)
     }
 }
-
-#Preview {
-    AddWardDetailedView()
-        .environmentObject(AppState())
-}

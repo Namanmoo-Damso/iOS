@@ -121,20 +121,4 @@ struct RemoteNetworkIndicator: View {
         @unknown default: return .gray
         }
     }
-}
-
-#Preview {
-    ZStack {
-        Color.gray
-        VStack {
-            CallTopBar(
-                callerName: "Sarah Miller",
-                callDuration: 263,
-                isConnected: true,
-                remoteConnectionQuality: .good
-            )
-            Spacer()
-        }
-    }
-}
-#endif
+}#endif

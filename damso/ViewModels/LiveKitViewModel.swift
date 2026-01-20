@@ -65,6 +65,7 @@ final class LiveKitViewModel<
     }
 
     /// 알림에서 수락 시 자동으로 통화 시작 (WiFi-only iPad)
+    /// 주의: clearCall()은 여기서 호출하지 않음 - ContentView에서 화면 표시 후 호출
     private func handleAutoAccept(call: CallInfo) {
         // 중복 호출 방지
         guard !isHandlingAutoAccept else {
@@ -74,8 +75,8 @@ final class LiveKitViewModel<
         isHandlingAutoAccept = true
 
         print("📱 [ViewModel] handleAutoAccept START - roomName=\(call.roomName ?? "nil")")
-        callStateStore.clearCall()
-        print("📱 [ViewModel] handleAutoAccept - callStateStore.clearCall() done")
+        // clearCall()을 여기서 호출하면 ContentView의 .onChange가 상태를 놓침
+        // ContentView에서 showGlobalCallView = true 설정 후 clearCall() 호출
         if let roomName = call.roomName {
             print("📱 [ViewModel] handleAutoAccept - calling startCall(roomName: \(roomName))")
             startCall(roomName: roomName)

@@ -183,9 +183,10 @@ final class FaceDetectionDataChannel: NSObject, ObservableObject, FaceDetectionD
     // MARK: - Private Helpers
 
     private func debugLog(_ message: String) {
-        #if DEBUG
-        print("[FaceDetectionDataChannel] \(message)")
-        #endif
+        // Face 로그 비활성화
+        // #if DEBUG
+        // print("[FaceDetectionDataChannel] \(message)")
+        // #endif
     }
 }
 

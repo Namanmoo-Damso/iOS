@@ -342,7 +342,3 @@ final class ScheduleManagementViewModel: ObservableObject {
 }
 
 // MARK: - Preview
-
-#Preview {
-    ScheduleManagementView()
-}

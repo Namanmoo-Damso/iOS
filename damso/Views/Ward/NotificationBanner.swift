@@ -33,18 +33,3 @@ struct NotificationBanner: View {
         )
     }
 }
-
-#Preview {
-    VStack(spacing: 16) {
-        NotificationBanner(
-            message: "오늘 오후에 안부 전화를 드릴 예정이에요."
-        )
-
-        NotificationBanner(
-            message: "새로운 메시지가 도착했습니다.",
-            icon: "envelope.fill"
-        )
-    }
-    .padding()
-    .background(Color(.systemGroupedBackground))
-}

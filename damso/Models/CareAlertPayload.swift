@@ -169,6 +169,12 @@ struct DeviceFallAlertData: Codable, Sendable {
     /// 최대 회전 속도 (rad/s)
     let maxRotationRate: Float?
 
+    /// 위험 수준 (normal/caution/critical)
+    let riskLevel: DeviceFallRiskLevel?
+
+    /// 위험도 점수 (0.0 ~ 1.0)
+    let riskScore: Float?
+
     enum DeviceFallType: String, Codable, Sendable {
         /// 자유 낙하 후 충격
         case freefallImpact = "freefall_impact"
@@ -178,6 +184,13 @@ struct DeviceFallAlertData: Codable, Sendable {
         case rotationImpact = "rotation_impact"
         /// 복합 감지
         case combination = "combination"
+    }
+
+    /// 위험 수준 (페이로드용)
+    enum DeviceFallRiskLevel: String, Codable, Sendable {
+        case normal = "normal"
+        case caution = "caution"
+        case critical = "critical"
     }
 }
 
@@ -338,20 +351,69 @@ struct EmergencyConfirmedData: Codable, Sendable {
 
 /// Agent가 iOS에 보내는 알림 응답 (alert_response 토픽)
 struct AlertResponse: Codable, Sendable {
+    // MARK: - 필수 필드
+
+    /// 알림 ID (acknowledge_alert 응답 시 필수)
+    let alertId: String
+
     /// 알림 타입 (device_fall, person_fall, loud_voice, emotion)
     let alertType: String
 
+    // MARK: - 선택 필드
+
+    /// Ward ID
+    let wardId: String?
+
     /// 심각도 (low, medium, high, critical)
-    let severity: String
+    let severity: String?
+
+    /// 위험 수준 (caution: 노란색, critical: 빨간색)
+    let riskLevel: AlertRiskLevel?
+
+    /// 위험도 점수 (0.0 ~ 1.0)
+    let riskScore: Float?
 
     /// Agent의 음성 응답 메시지
-    let agentResponse: String
+    let agentResponse: String?
 
     /// 타임스탬프 (Unix milliseconds)
-    let timestamp: Int64
+    let timestamp: Int64?
+
+    /// 감지 상세 정보
+    let detectionInfo: AlertDetectionInfo?
 
     /// DataChannel topic
     static let topic = "alert_response"
+
+    /// 위험 수준 (UI 색상 결정용)
+    enum AlertRiskLevel: String, Codable, Sendable {
+        case caution = "caution"    // 노란색 (주의)
+        case critical = "critical"  // 빨간색 (경고)
+    }
+}
+
+/// Alert 감지 상세 정보
+struct AlertDetectionInfo: Codable, Sendable {
+    /// 감지 타입
+    let type: String
+
+    /// 심각도
+    let severity: String
+
+    /// 판단 기준 목록
+    let criteria: [AlertCriterion]?
+}
+
+/// Alert 판단 기준
+struct AlertCriterion: Codable, Sendable {
+    /// 기준 이름
+    let name: String
+
+    /// 기준 값
+    let value: String
+
+    /// 수준 (low, medium, high, critical)
+    let level: String
 }
 
 // MARK: - DataChannel Constants

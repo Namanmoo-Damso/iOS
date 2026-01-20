@@ -35,7 +35,7 @@ final class TranscriptionManager: ObservableObject {
     /// 자막 활성화 상태
     @Published private(set) var isActive: Bool = false
 
-    /// AI가 현재 말하고 있는지 (자막 기반)
+    /// AI가 현재 말하고 있는지 (LiveKit VAD 기반)
     @Published private(set) var isAISpeaking: Bool = false
 
     // MARK: - Legacy Properties (하위 호환성)
@@ -60,6 +60,15 @@ final class TranscriptionManager: ObservableObject {
 
     private let maxHistoryCount = 50  // 최대 히스토리 개수
 
+    /// LiveKit VAD가 활성화되었는지 여부 (한 번이라도 호출되면 true)
+    private var isLiveKitVADActive: Bool = false
+
+    /// 자막 기반 fallback 타이머
+    private var subtitleFallbackTimer: DispatchWorkItem?
+
+    /// 자막 기반 fallback 타임아웃 (초)
+    private let subtitleFallbackTimeout: TimeInterval = 2.0
+
     // MARK: - Initialization
 
     private init() {}
@@ -78,16 +87,37 @@ final class TranscriptionManager: ObservableObject {
         clearAll()
     }
 
+    /// AI 발화 상태 설정 (LiveKit VAD에서 호출 - 우선순위 높음)
+    func setAISpeaking(_ speaking: Bool) {
+        // LiveKit VAD가 동작함을 표시
+        isLiveKitVADActive = true
+
+        // 자막 fallback 타이머 취소 (LiveKit VAD가 제어권 가짐)
+        subtitleFallbackTimer?.cancel()
+        subtitleFallbackTimer = nil
+
+        guard isAISpeaking != speaking else { return }
+        isAISpeaking = speaking
+        #if DEBUG
+        print("🎙️ [Transcription] AI \(speaking ? "Speaking" : "Listening") (from LiveKit VAD)")
+        #endif
+    }
+
     /// Agent 자막 업데이트
     func updateAgentSubtitle(text: String, isFinal: Bool) {
         guard isActive else { return }
 
-        // AI가 말하고 있음 (자막이 오면 말하는 중)
-        if !text.isEmpty {
-            isAISpeaking = true
-            #if DEBUG
-            print("🎙️ [Transcription] AI Speaking (agent subtitle received)")
-            #endif
+        // LiveKit VAD가 동작 중이면 자막으로 상태 변경하지 않음
+        if !isLiveKitVADActive {
+            // Fallback: 자막 기반으로 AI 발화 상태 추정
+            if !text.isEmpty && !isAISpeaking {
+                // 명시적으로 objectWillChange 트리거
+                objectWillChange.send()
+                isAISpeaking = true
+                #if DEBUG
+                print("🎙️ [Transcription] AI Speaking (subtitle fallback) → isAISpeaking=\(isAISpeaking)")
+                #endif
+            }
         }
 
         if isFinal && !text.isEmpty {
@@ -96,32 +126,44 @@ final class TranscriptionManager: ObservableObject {
             addMessage(message)
             currentAgentText = ""
 
-            // 잠시 후 말하기 종료 (다음 자막이 오지 않으면)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-                if self?.currentAgentText.isEmpty == true {
-                    self?.isAISpeaking = false
-                    #if DEBUG
-                    print("🎙️ [Transcription] AI Silent (no more agent subtitle)")
-                    #endif
-                }
+            // LiveKit VAD가 없으면 타이머로 종료 감지
+            if !isLiveKitVADActive {
+                scheduleSubtitleFallbackEnd()
             }
         } else {
             // 진행 중인 자막은 현재 텍스트로 표시
             currentAgentText = text
+
+            // 진행 중인 자막도 타이머 리셋
+            if !isLiveKitVADActive && !text.isEmpty {
+                scheduleSubtitleFallbackEnd()
+            }
         }
+    }
+
+    /// 자막 기반 AI 발화 종료 타이머 (fallback)
+    private func scheduleSubtitleFallbackEnd() {
+        subtitleFallbackTimer?.cancel()
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self = self, !self.isLiveKitVADActive else { return }
+            if self.currentAgentText.isEmpty {
+                // 명시적으로 objectWillChange 트리거
+                self.objectWillChange.send()
+                self.isAISpeaking = false
+                #if DEBUG
+                print("🎙️ [Transcription] AI Listening (subtitle fallback timeout) → isAISpeaking=\(self.isAISpeaking)")
+                #endif
+            }
+        }
+
+        subtitleFallbackTimer = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + subtitleFallbackTimeout, execute: workItem)
     }
 
     /// 사용자 자막 업데이트 (STT 결과)
     func updateUserSubtitle(text: String, isFinal: Bool) {
         guard isActive else { return }
-
-        // 사용자가 말하면 AI는 듣는 중
-        if !text.isEmpty {
-            isAISpeaking = false
-            #if DEBUG
-            print("🎙️ [Transcription] User Speaking → AI Listening")
-            #endif
-        }
 
         if isFinal && !text.isEmpty {
             // 확정된 자막은 히스토리에 추가
@@ -136,6 +178,10 @@ final class TranscriptionManager: ObservableObject {
 
     /// 모든 자막 초기화
     func clearAll() {
+        subtitleFallbackTimer?.cancel()
+        subtitleFallbackTimer = nil
+        isLiveKitVADActive = false
+
         messages = []
         currentAgentText = ""
         currentUserText = ""
@@ -157,17 +203,52 @@ final class TranscriptionManager: ObservableObject {
 
     /// TranscriptionSegment 배열 처리
     func processTranscriptionSegments(_ segments: [TranscriptionSegment], participantIdentity: String?) {
-        guard isActive, !segments.isEmpty else { return }
+        #if DEBUG
+        print("🎙️ [Transcription] processTranscriptionSegments called - isActive=\(isActive), segments=\(segments.count), identity=\(participantIdentity ?? "nil")")
+        #endif
+
+        guard isActive, !segments.isEmpty else {
+            #if DEBUG
+            print("🎙️ [Transcription] Skipped - isActive=\(isActive), isEmpty=\(segments.isEmpty)")
+            #endif
+            return
+        }
 
         let combinedText = segments.map { $0.text }.joined(separator: " ")
         let isFinal = segments.last?.isFinal ?? false
 
+        #if DEBUG
+        print("🎙️ [Transcription] Text: \"\(combinedText)\", isFinal=\(isFinal)")
+        #endif
+
         // Agent인지 사용자인지 구분
-        if let identity = participantIdentity, identity.hasPrefix("agent-") {
+        // agent-, sodam, 또는 LocalParticipant가 아닌 경우 Agent로 처리
+        let isAgent = isAgentParticipant(identity: participantIdentity)
+
+        #if DEBUG
+        print("🎙️ [Transcription] isAgent=\(isAgent)")
+        #endif
+
+        if isAgent {
             updateAgentSubtitle(text: combinedText, isFinal: isFinal)
         } else {
             updateUserSubtitle(text: combinedText, isFinal: isFinal)
         }
+    }
+
+    /// Agent participant인지 확인
+    private func isAgentParticipant(identity: String?) -> Bool {
+        guard let identity = identity else { return false }
+
+        // Agent identity 패턴들
+        let agentPatterns = ["agent-", "sodam", "ai-", "assistant"]
+        for pattern in agentPatterns {
+            if identity.lowercased().contains(pattern) {
+                return true
+            }
+        }
+
+        return false
     }
 }
 

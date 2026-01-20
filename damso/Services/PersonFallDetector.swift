@@ -56,6 +56,10 @@ final class PersonFallDetector: ObservableObject {
     /// 안정적인 추적 후에만 낙상 감지 시작
     var minimumTrackingTime: Float = 2.0
 
+    /// 얼굴 실종 감지 활성화 여부
+    /// false로 설정 시 얼굴이 사라져도 낙상 알림을 보내지 않음
+    var faceDisappearanceDetectionEnabled: Bool = false
+
     // MARK: - Private Properties
 
     private let faceLandmarkDetector = FaceLandmarkDetector.shared
@@ -107,6 +111,9 @@ final class PersonFallDetector: ObservableObject {
         lastFaceDetectedTime = nil
         wasTrackingFace = false
         isFallWarning = false
+
+        // 얼굴 Y 좌표 초기화 (다음 통화 시 이전 값 잔류 방지)
+        lastFaceY = 0.5
 
         debugLog("Person fall detection stopped")
     }
@@ -219,6 +226,8 @@ final class PersonFallDetector: ObservableObject {
 
     /// 얼굴 실종 체크
     private func checkFaceDisappearance() {
+        // 얼굴 실종 감지 비활성화 시 스킵
+        guard faceDisappearanceDetectionEnabled else { return }
         guard isActive, wasTrackingFace == false else { return }
 
         // 충분한 추적 시간이 있었는지 확인
@@ -264,7 +273,21 @@ final class PersonFallDetector: ObservableObject {
 
         debugLog("🚨 Person fall detected! Type: \(detectionType), yDelta: \(faceYDelta ?? 0), time: \(deltaTime)s")
 
-        // CareAlertService를 통해 알림 전송
+        // useThresholdBasedAlerts가 false면 care_alert 전송 안함
+        // SensorStreamService가 원시 데이터를 전송하고 Agent가 판단
+        guard careAlertService.useThresholdBasedAlerts else {
+            debugLog("⚙️ Threshold-based alerts disabled - skipping care_alert (SensorStreamService sends raw data)")
+            // 경고 상태만 리셋
+            Task {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                await MainActor.run {
+                    self.isFallWarning = false
+                }
+            }
+            return
+        }
+
+        // CareAlertService를 통해 알림 전송 (useThresholdBasedAlerts == true일 때만)
         Task {
             do {
                 try await careAlertService.sendPersonFallAlert(
@@ -292,9 +315,10 @@ final class PersonFallDetector: ObservableObject {
     // MARK: - Debug
 
     private func debugLog(_ message: String) {
-        #if DEBUG
-        print("[PersonFallDetector] \(message)")
-        #endif
+        // Face 로그 비활성화
+        // #if DEBUG
+        // print("[PersonFallDetector] \(message)")
+        // #endif
     }
 }
 

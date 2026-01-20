@@ -250,8 +250,3 @@ struct WardHomeView: View {
         )
     }
 }
-
-#Preview {
-    WardHomeView()
-        .environmentObject(AppState())
-}

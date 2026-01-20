@@ -9,7 +9,7 @@ struct StartView: View {
         ("문성수", "4.sodam.store"),
         ("배재완", "5.sodam.store"),
         ("임익화", "2.sodam.store"),
-        ("식스맨", "sodam.store")
+        ("배포서버", "sodam.store")
     ]
     
     var body: some View {
@@ -24,6 +24,8 @@ struct StartView: View {
                     Button(action: {
                         AppConfig.serverDomain = domain
                         AppConfig.selectedDeveloperName = name
+                        // 김상연, 배포서버만 api. prefix 사용
+                        AppConfig.usesApiPrefix = (name == "김상연" || name == "배포서버")
                         isServerSelected = true
                     }) {
                         Text(name)
@@ -31,7 +33,7 @@ struct StartView: View {
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(name == "식스맨" ? Color.orange : Color.blue)
+                            .background(name == "배포서버" ? Color.orange : Color.blue)
                             .cornerRadius(12)
                     }
                     .padding(.horizontal, 40)
@@ -42,8 +44,4 @@ struct StartView: View {
         }
         .background(Color(.systemGroupedBackground))
     }
-}
-
-#Preview {
-    StartView(isServerSelected: .constant(false))
 }

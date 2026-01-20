@@ -187,27 +187,3 @@ struct IncomingCallBanner: View {
         .padding(.horizontal)
     }
 }
-
-#Preview("전체화면 전화 수신") {
-    IncomingCallFullScreenView(
-        caller: "소담이",
-        onAccept: {},
-        onDecline: {}
-    )
-}
-
-#Preview("배너 전화 수신") {
-    ZStack {
-        Color.black.ignoresSafeArea()
-
-        VStack {
-            IncomingCallBanner(
-                caller: "소담이",
-                onAccept: {},
-                onDecline: {}
-            )
-            .padding(.top, 60)
-            Spacer()
-        }
-    }
-}

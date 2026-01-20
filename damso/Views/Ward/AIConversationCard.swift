@@ -68,11 +68,3 @@ struct AIConversationCard: View {
         .padding(.horizontal)
     }
 }
-
-#Preview {
-    AIConversationCard {
-        print("Start call tapped")
-    }
-    .padding()
-    .background(Color(.systemGroupedBackground))
-}

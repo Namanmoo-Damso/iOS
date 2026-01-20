@@ -122,33 +122,3 @@ struct GlowCircleView: View {
         }
     }
 }
-
-#Preview("Glow Circle - Idle") {
-    ZStack {
-        Color(hex: "1C1C1E")
-            .ignoresSafeArea()
-
-        VStack(spacing: 40) {
-            GlowCircleView(audioLevel: 0)
-
-            Text("대기 중...")
-                .font(.system(size: 24, weight: .medium))
-                .foregroundColor(.white.opacity(0.6))
-        }
-    }
-}
-
-#Preview("Glow Circle - Speaking") {
-    ZStack {
-        Color(hex: "1C1C1E")
-            .ignoresSafeArea()
-
-        VStack(spacing: 40) {
-            GlowCircleView(audioLevel: 0.6)
-
-            Text("AI가 말하는 중...")
-                .font(.system(size: 24, weight: .medium))
-                .foregroundColor(.white)
-        }
-    }
-}

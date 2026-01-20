@@ -22,9 +22,24 @@ struct AppConfig {
         }
     }
 
+    /// API prefix 사용 여부 (api.도메인 vs 도메인)
+    /// 김상연, 식스맨만 api. prefix 사용
+    static var usesApiPrefix: Bool {
+        get {
+            UserDefaults.standard.bool(forKey: "usesApiPrefix")
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "usesApiPrefix")
+        }
+    }
+
     /// HTTP API 기본 주소
     static var apiBaseURL: String {
-        return "https://\(serverDomain)"
+        if usesApiPrefix {
+            return "https://api.\(serverDomain)"
+        } else {
+            return "https://\(serverDomain)"
+        }
     }
 
     /// LiveKit WebSocket 주소

@@ -223,15 +223,25 @@ final class MotionSensorService: ObservableObject, MotionSensorProtocol {
         lastSensorData = sensorData
         sensorDataSubject.send(sensorData)
 
-        // 낙상 이벤트 발생
-        if fallDetected {
+        // 낙상 이벤트 발생 (주의/위급 모두 전송)
+        let riskLevel = FallRiskLevel.from(risk: fallRisk)
+        if riskLevel != .normal {
             let event = FallEvent(
                 type: .combination,
                 impactMagnitude: userAccel.magnitude,
-                sensorSnapshot: sensorData
+                sensorSnapshot: sensorData,
+                riskScore: fallRisk
             )
             fallDetectedSubject.send(event)
-            debugLog("⚠️ Fall detected! Impact: \(userAccel.magnitude)g")
+
+            switch riskLevel {
+            case .caution:
+                debugLog("⚠️ Fall risk CAUTION! Risk: \(String(format: "%.2f", fallRisk)), Impact: \(userAccel.magnitude)g")
+            case .critical:
+                debugLog("🚨 Fall risk CRITICAL! Risk: \(String(format: "%.2f", fallRisk)), Impact: \(userAccel.magnitude)g")
+            case .normal:
+                break
+            }
         }
 
         // Data Channel로 전송 (rate limiting 적용)
@@ -251,7 +261,7 @@ final class MotionSensorService: ObservableObject, MotionSensorProtocol {
     /// 낙상 감지 알고리즘
     /// 1. 자유 낙하 감지: userAcceleration 크기가 임계값 이하
     /// 2. 충격 감지: userAcceleration 크기가 임계값 이상
-    /// 3. 조합 감지: 자유 낙하 후 충격
+    /// 3. 조합 감지: 자유 낙하 후 충격 (순차적 누적)
     private func checkFallDetection(
         userAcceleration: Vector3D,
         gravity: Vector3D,
@@ -267,14 +277,15 @@ final class MotionSensorService: ObservableObject, MotionSensorProtocol {
         }
 
         var fallRisk: Float = 0.0
+        var freefallContribution: Float = 0.0
 
-        // 총 기여도 = 1.0 (0.25 + 0.25 + 0.2 + 0.1 + 0.2)
         // 1. 자유 낙하 감지 (가속도가 거의 0)
         if accelMagnitude < MotionSensorData.freefallThreshold {
             if freefallStartTime == nil {
                 freefallStartTime = Date()
             }
-            fallRisk += 0.25
+            freefallContribution = 0.25
+            fallRisk += freefallContribution
         } else {
             // 자유 낙하 후 충격 확인
             if let startTime = freefallStartTime {
@@ -286,6 +297,13 @@ final class MotionSensorService: ObservableObject, MotionSensorProtocol {
                     return (true, 1.0)  // 확실한 낙상
                 }
 
+                // 자유 낙하 후 충격 발생 시, 자유낙하 기여도도 합산
+                if freefallDuration > 0.05 && accelMagnitude > MotionSensorData.impactThreshold * 0.5 {
+                    // 자유낙하 기여도 유지 (시퀀스 감지)
+                    freefallContribution = 0.25
+                    fallRisk += freefallContribution
+                }
+
                 // 1초 이상 자유 낙하 없으면 리셋
                 if freefallDuration > 1.0 {
                     freefallStartTime = nil
@@ -293,14 +311,22 @@ final class MotionSensorService: ObservableObject, MotionSensorProtocol {
             }
         }
 
-        // 2. 단독 충격 감지
+        // 2. 충격 감지 (자유낙하와 별개로 항상 체크)
         if accelMagnitude > MotionSensorData.impactThreshold {
-            fallRisk += 0.25
+            // 충격 강도에 비례하여 기여도 계산 (최대 0.35)
+            let impactRatio = min(1.0, (accelMagnitude - MotionSensorData.impactThreshold) / 5.0)
+            let impactContribution = 0.25 + (impactRatio * 0.10)
+            fallRisk += impactContribution
+        } else if accelMagnitude > MotionSensorData.impactThreshold * 0.5 {
+            // 중간 수준 충격도 일부 반영
+            fallRisk += 0.15
         }
 
-        // 3. 급격한 회전 감지
+        // 3. 급격한 회전 감지 (강도에 비례)
         if rotationMagnitude > MotionSensorData.rotationThreshold {
-            fallRisk += 0.2
+            let rotationRatio = min(1.0, (rotationMagnitude - MotionSensorData.rotationThreshold) / 5.0)
+            let rotationContribution = 0.15 + (rotationRatio * 0.10)
+            fallRisk += rotationContribution
         }
 
         // 4. 최근 가속도 패턴 분석
@@ -308,16 +334,17 @@ final class MotionSensorService: ObservableObject, MotionSensorProtocol {
             let avgMagnitude = recentAccelerations.map { $0.magnitude }.reduce(0, +) / Float(recentAccelerations.count)
             let variance = recentAccelerations.map { pow($0.magnitude - avgMagnitude, 2) }.reduce(0, +) / Float(recentAccelerations.count)
 
-            // 높은 분산 = 불안정한 움직임
-            if variance > 1.0 {
-                fallRisk += 0.1
+            // 분산에 비례하여 기여도 계산
+            if variance > 0.5 {
+                let varianceContribution = min(0.15, variance * 0.05)
+                fallRisk += varianceContribution
             }
         }
 
-        // 5. 큰 소리/비명 감지 (움직임과 동시 발생 시 낙상 확률 증가)
+        // 5. 큰 소리/비명 감지
         if UserAudioLevelMonitor.shared.isWarningActive {
-            fallRisk += 0.2
-            debugLog("🔊 Loud voice detected, adding to fall risk (+0.2)")
+            fallRisk += 0.20
+            debugLog("🔊 Loud voice detected, adding to fall risk (+0.20)")
         }
 
         fallRisk = min(1.0, fallRisk)

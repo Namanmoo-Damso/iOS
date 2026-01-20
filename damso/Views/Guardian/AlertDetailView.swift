@@ -439,14 +439,3 @@ struct AlertDetailView: View {
         }
     }
 }
-
-#Preview {
-    NavigationStack {
-        AlertDetailView(alert: DashboardAlert(
-            id: "1",
-            type: .warning,
-            message: "3일 연속 통증 관련 단어가 감지되었습니다",
-            date: "2024-12-24"
-        ))
-    }
-}

@@ -253,48 +253,11 @@ struct CallHistoryListView: View {
     private func loadCalls() async {
         isLoading = true
 
-        // Mock 데이터 로드
-        try? await Task.sleep(nanoseconds: 300_000_000)
-
-        calls = generateMockCalls()
+        // TODO: API 연동 필요 - GET /v1/guardian/calls
+        // 현재는 빈 배열로 초기화
+        calls = []
+        
         isLoading = false
-    }
-
-    private func generateMockCalls() -> [RecentCall] {
-        let summaries = [
-            "어머니께서 오늘 날씨가 좋다고 말씀하시며 산책을 다녀오셨다고 하셨습니다.",
-            "평소와 같은 일상 대화를 나누셨습니다. 특별한 이상 징후는 없었습니다.",
-            "손주들 이야기를 하시며 즐거운 시간을 보내셨습니다.",
-            "오늘 드라마 이야기를 하시면서 흥미진진해 하셨습니다.",
-            "약간 피곤하다고 하셨지만 전반적으로 건강하신 것 같습니다.",
-            "옛날 이야기를 들려주시며 추억을 회상하셨습니다.",
-            "최근 건강 검진 결과에 대해 이야기 나누셨습니다.",
-            "이웃 할머니와의 만남에 대해 즐겁게 말씀하셨습니다."
-        ]
-
-        let tagOptions = [
-            ["날씨", "산책", "긍정적"],
-            ["일상"],
-            ["가족", "손주", "즐거움"],
-            ["드라마", "취미"],
-            ["건강", "피로"],
-            ["추억", "옛날"],
-            ["건강", "검진"],
-            ["이웃", "사회활동"]
-        ]
-
-        let moods: [RecentCall.CallMood] = [.positive, .neutral, .positive, .positive, .neutral, .positive, .neutral, .positive]
-
-        return (0..<20).map { index in
-            RecentCall(
-                id: "\(index)",
-                date: Date().addingTimeInterval(TimeInterval(-86400 * index)),
-                duration: Int.random(in: 5...20),
-                summary: summaries[index % summaries.count],
-                tags: tagOptions[index % tagOptions.count],
-                mood: moods[index % moods.count]
-            )
-        }
     }
 }
 
@@ -406,12 +369,5 @@ struct CallHistoryRow: View {
         }
         .padding()
         .background(Color(.systemBackground))
-    }
-}
-
-#Preview {
-    NavigationStack {
-        CallHistoryListView()
-            .environmentObject(AppState())
     }
 }

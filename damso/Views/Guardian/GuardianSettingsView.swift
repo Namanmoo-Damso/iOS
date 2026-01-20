@@ -249,8 +249,3 @@ struct WardInfoCard: View {
         .padding(.vertical, 8)
     }
 }
-
-#Preview {
-    GuardianSettingsView()
-        .environmentObject(AppState())
-}

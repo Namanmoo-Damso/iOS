@@ -4,6 +4,9 @@
 //
 //  Created by Claude Code on 2025-01-10.
 //
+//  AVAudioEngine inputNode tap 방식으로 로컬 마이크 레벨 수집
+//  (LiveKit LocalAudioTrack의 AudioRenderer는 콜백이 호출되지 않음)
+//
 
 import Foundation
 import AVFoundation
@@ -13,8 +16,15 @@ import Combine
 #if canImport(LiveKit)
 import LiveKit
 
+// MARK: - Error Types
+
+enum AudioMonitorError: Error {
+    case engineCreationFailed
+    case engineNotInitialized
+}
+
 /// 사용자 마이크 음량 모니터링 서비스
-/// LocalAudioTrack에 연결하여 큰 소리 감지 시 알림 전송
+/// AVAudioEngine inputNode tap을 사용하여 로컬 마이크 오디오 캡처
 /// VAD(Voice Activity Detection)와 연동하여 음성일 때만 경고 발생
 @MainActor
 final class UserAudioLevelMonitor: NSObject, ObservableObject {
@@ -74,8 +84,10 @@ final class UserAudioLevelMonitor: NSObject, ObservableObject {
     private var smoothedLevel: Float = 0
     private let smoothingFactor: Float = 0.3
 
-    // 렌더러 참조
-    private var audioRenderer: UserAudioRenderer?
+    // AVAudioEngine for input tap
+    private var audioEngine: AVAudioEngine?
+    private let tapBusIndex: AVAudioNodeBus = 0
+    private let tapBufferSize: AVAudioFrameCount = 4096
 
     // VAD 구독
     private var cancellables = Set<AnyCancellable>()
@@ -84,9 +96,6 @@ final class UserAudioLevelMonitor: NSObject, ObservableObject {
 
     private override init() {
         super.init()
-        audioRenderer = UserAudioRenderer { [weak self] pcmBuffer in
-            self?.processAudioBuffer(pcmBuffer)
-        }
         setupVADSubscription()
     }
 
@@ -111,32 +120,40 @@ final class UserAudioLevelMonitor: NSObject, ObservableObject {
 
     // MARK: - Public Methods
 
-    /// 모니터링 시작 (LocalAudioTrack에 연결)
+    /// 모니터링 시작 (AVAudioEngine inputNode tap 사용)
+    /// - Parameter track: LiveKit LocalAudioTrack (호환성을 위해 유지, 실제로는 사용하지 않음)
     func startMonitoring(track: LocalAudioTrack) {
         guard !isMonitoring else { return }
 
-        if let renderer = audioRenderer {
-            track.add(audioRenderer: renderer)
-        }
+        isMonitoring = true
+        isActiveUnsafe = true
 
         // VAD 시작
         if useVAD {
             vadService.start()
         }
 
-        isMonitoring = true
-        isActiveUnsafe = true
-
         debugLog("✅ Started monitoring local audio (VAD: \(useVAD ? "enabled" : "disabled"))")
+
+        // AVAudioEngine을 LiveKit 초기화 완료 후 별도 큐에서 지연 시작
+        // LiveKit의 오디오 파이프라인과 충돌 방지
+        let audioQueue = DispatchQueue(label: "com.damso.audioMonitor", qos: .userInteractive)
+        audioQueue.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            do {
+                try self?.setupAudioEngineOnQueue()
+            } catch {
+                Task { @MainActor in
+                    self?.debugLog("❌ Failed to start audio monitoring: \(error)")
+                }
+            }
+        }
     }
 
     /// 모니터링 중지
     func stopMonitoring(track: LocalAudioTrack) {
         guard isMonitoring else { return }
 
-        if let renderer = audioRenderer {
-            track.remove(audioRenderer: renderer)
-        }
+        stopAudioEngine()
 
         // VAD 중지
         vadService.stop()
@@ -153,7 +170,82 @@ final class UserAudioLevelMonitor: NSObject, ObservableObject {
         debugLog("Stopped monitoring local audio")
     }
 
-    // MARK: - Private Methods
+    // MARK: - AVAudioEngine Setup
+
+    /// 별도 큐에서 AVAudioEngine 설정 및 시작 (nonisolated)
+    /// LiveKit 오디오 파이프라인과의 dispatch queue 충돌 방지
+    nonisolated private func setupAudioEngineOnQueue() throws {
+        let engine = AVAudioEngine()
+        
+        let inputNode = engine.inputNode
+        let inputFormat = inputNode.outputFormat(forBus: 0)
+        
+        Task { @MainActor [weak self] in
+            self?.debugLog("📢 Input format: \(inputFormat)")
+        }
+        
+        // inputNode에 tap 설치
+        inputNode.installTap(
+            onBus: 0,
+            bufferSize: 4096,
+            format: inputFormat
+        ) { [weak self] buffer, _ in
+            self?.processAudioBuffer(buffer)
+        }
+        
+        // AVAudioSession은 LiveKit이 이미 설정했으므로 건드리지 않음
+        try engine.start()
+        
+        // MainActor에서 engine 참조 저장
+        Task { @MainActor [weak self] in
+            self?.audioEngine = engine
+            self?.debugLog("🎤 AVAudioEngine started on background queue")
+        }
+    }
+
+    private func setupAudioEngine() throws {
+        audioEngine = AVAudioEngine()
+
+        guard let engine = audioEngine else {
+            throw AudioMonitorError.engineCreationFailed
+        }
+
+        let inputNode = engine.inputNode
+        let inputFormat = inputNode.outputFormat(forBus: tapBusIndex)
+
+        debugLog("📢 Input format: \(inputFormat)")
+
+        // inputNode에 tap 설치
+        inputNode.installTap(
+            onBus: tapBusIndex,
+            bufferSize: tapBufferSize,
+            format: inputFormat
+        ) { [weak self] buffer, _ in
+            self?.processAudioBuffer(buffer)
+        }
+    }
+
+    private func startAudioEngine() throws {
+        guard let engine = audioEngine else {
+            throw AudioMonitorError.engineNotInitialized
+        }
+
+        // AVAudioSession은 LiveKit이 이미 설정했으므로 건드리지 않음
+        try engine.start()
+        debugLog("🎤 AVAudioEngine started")
+    }
+
+    private func stopAudioEngine() {
+        guard let engine = audioEngine else { return }
+
+        engine.inputNode.removeTap(onBus: tapBusIndex)
+        engine.stop()
+        audioEngine = nil
+
+        debugLog("🎤 AVAudioEngine stopped")
+    }
+
+    // MARK: - Audio Processing
 
     /// 오디오 버퍼 처리 (nonisolated → MainActor로 전달)
     nonisolated private func processAudioBuffer(_ pcmBuffer: AVAudioPCMBuffer) {

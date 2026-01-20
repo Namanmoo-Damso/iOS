@@ -211,11 +211,3 @@ class PlayerUIView: UIView {
         playerLayer.isOpaque = false
     }
 }
-
-#Preview("Looping Video") {
-    ZStack {
-        Color.black
-        LoopingVideoPlayer(videoName: "talking_final")
-            .frame(width: 300, height: 300)
-    }
-}

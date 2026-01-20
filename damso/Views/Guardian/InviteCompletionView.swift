@@ -152,12 +152,3 @@ struct InviteCompletionView: View {
         }
     }
 }
-
-#Preview {
-    InviteCompletionView(
-        guardianId: "guardian-123",
-        guardianName: "홍길동",
-        wardEmail: "elder@email.com",
-        onComplete: { print("Complete") }
-    )
-}

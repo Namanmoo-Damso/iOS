@@ -137,20 +137,4 @@ struct VideoQualitySelector: View {
             }
         }
     }
-}
-
-#Preview {
-    ZStack {
-        Color.gray
-        VStack {
-            Spacer()
-            VideoQualitySelector(
-                selectedQuality: .constant(.auto),
-                isExpanded: .constant(true),
-                currentResolution: "720p"
-            )
-            .padding(.bottom, 100)
-        }
-    }
-}
-#endif
+}#endif

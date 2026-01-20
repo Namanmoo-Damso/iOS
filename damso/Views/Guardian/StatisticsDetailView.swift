@@ -566,12 +566,3 @@ struct StatisticsDetailView: View {
         .cornerRadius(8)
     }
 }
-
-#Preview {
-    NavigationStack {
-        StatisticsDetailView(
-            statisticType: .mood,
-            viewModel: GuardianDashboardViewModel()
-        )
-    }
-}

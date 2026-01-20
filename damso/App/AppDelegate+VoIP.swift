@@ -118,7 +118,7 @@ extension AppDelegate: PKPushRegistryDelegate {
                 completion?()
             }
         } else {
-            // Background: 일반 CallKit 플로우
+            // Background/Lock screen: CallKit UI 사용
             print("📥 [VoIP] 📱 Background - Using CallKit UI")
 
             callManager.reportIncomingCall(

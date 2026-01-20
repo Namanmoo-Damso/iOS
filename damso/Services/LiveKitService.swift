@@ -236,6 +236,10 @@ final class LiveKitService: NSObject, ObservableObject, LiveKitServiceProtocol {
         careAlertService.start(room: room, wardId: wardId)
         debugLog("🔌 [CONNECT] CareAlertService started (wardId: \(wardId ?? "unknown"))")
 
+        // 센서 스트림 서비스 시작 (매초 raw data 전송)
+        SensorStreamService.shared.start(room: room)
+        debugLog("🔌 [CONNECT] SensorStreamService started")
+
         // 사용자 음성 레벨 모니터링 시작
         if let localAudioTrack = room.localParticipant.localAudioTracks.first?.track as? LocalAudioTrack {
             userAudioMonitor.startMonitoring(track: localAudioTrack)
@@ -299,6 +303,10 @@ final class LiveKitService: NSObject, ObservableObject, LiveKitServiceProtocol {
         // 케어 알림 서비스 중지
         careAlertService.stop()
         debugLog("🔌 [DISCONNECT] CareAlertService stopped")
+
+        // 센서 스트림 서비스 중지
+        SensorStreamService.shared.stop()
+        debugLog("🔌 [DISCONNECT] SensorStreamService stopped")
 
         // 사용자 음성 레벨 모니터링 중지
         if let localAudioTrack = room.localParticipant.localAudioTracks.first?.track as? LocalAudioTrack {
@@ -474,6 +482,9 @@ extension LiveKitService: RoomDelegate {
                 } else {
                     self.audioVisualizer.simulateSilent()
                 }
+
+                // TranscriptionManager에도 AI 발화 상태 전달 (듣는중/말하는중 UI용)
+                self.transcription.setAISpeaking(isSpeaking)
             }
         }
     }
@@ -653,8 +664,8 @@ extension LiveKitService: RoomDelegate {
     private func handleAlertResponse(_ data: Data, from identity: String?) {
         do {
             let response = try JSONDecoder().decode(AlertResponse.self, from: data)
-            debugLog("📢 AlertResponse: type=\(response.alertType), severity=\(response.severity)")
-            debugLog("📢 Agent says: \(response.agentResponse)")
+            debugLog("📢 AlertResponse: type=\(response.alertType), severity=\(response.severity ?? "unknown")")
+            debugLog("📢 Agent says: \(response.agentResponse ?? "")")
 
             // CareAlertService에 전달하여 iOS Alert 표시
             careAlertService.handleAlertResponse(response)

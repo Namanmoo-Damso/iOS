@@ -190,17 +190,3 @@ struct SimpleSiriWaveView: View {
         }
     }
 }
-
-#Preview("Siri Wave") {
-    ZStack {
-        Color(hex: "1C1C1E")
-
-        VStack(spacing: 40) {
-            SimpleSiriWaveView(audioLevel: 0.5)
-
-            Text("AI가 말하는 중...")
-                .font(.system(size: 24, weight: .medium))
-                .foregroundColor(.white)
-        }
-    }
-}

@@ -156,7 +156,3 @@ struct UserProfileHeader: View {
         .cornerRadius(12)
     }
 }
-
-#Preview {
-    KakaoLoginView { _ in }
-}

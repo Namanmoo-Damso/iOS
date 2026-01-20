@@ -44,11 +44,6 @@ final class GuardianReportViewModel: ObservableObject {
         } catch {
             errorMessage = "보고서를 불러오는데 실패했습니다"
             print("[GuardianReportViewModel] Error: \(error)")
-
-            // 에러 시 Mock 데이터 사용 (개발용)
-            #if DEBUG
-            updateFromResponse(GuardianReportResponse.mock)
-            #endif
         }
 
         isLoading = false

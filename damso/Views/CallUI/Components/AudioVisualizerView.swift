@@ -138,23 +138,3 @@ struct CircularAudioVisualizerView: View {
         return min(1.0, max(0.0, bands[clampedIndex]))
     }
 }
-
-#Preview("Audio Visualizer") {
-    ZStack {
-        Color.black
-        VStack(spacing: 40) {
-            // 막대 이퀄라이저
-            AudioVisualizerView(
-                bands: (0..<32).map { _ in Float.random(in: 0.1...0.9) }
-            )
-            .frame(height: 120)
-            .padding(.horizontal, 20)
-
-            // 원형 이퀄라이저
-            CircularAudioVisualizerView(
-                bands: (0..<32).map { _ in Float.random(in: 0.1...0.9) }
-            )
-            .frame(width: 200, height: 200)
-        }
-    }
-}

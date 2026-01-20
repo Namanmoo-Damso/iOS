@@ -79,27 +79,3 @@ struct RecentCallCard: View {
         )
     }
 }
-
-#Preview {
-    VStack(spacing: 12) {
-        RecentCallCard(call: RecentCall(
-            id: "1",
-            date: Date(),
-            duration: 12,
-            summary: "어머니께서 오늘 날씨가 좋다고 말씀하시며 산책을 다녀오셨다고 하셨습니다.",
-            tags: ["날씨", "산책", "긍정적"],
-            mood: .positive
-        ))
-
-        RecentCallCard(call: RecentCall(
-            id: "2",
-            date: Date().addingTimeInterval(-86400),
-            duration: 8,
-            summary: "평소와 같은 일상 대화를 나누셨습니다.",
-            tags: ["일상"],
-            mood: .neutral
-        ))
-    }
-    .padding()
-    .background(Color(.systemGroupedBackground))
-}

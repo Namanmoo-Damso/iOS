@@ -56,17 +56,3 @@ extension Guardian {
         return user.nickname
     }
 }
-
-// MARK: - Mock Data (테스트용)
-
-#if DEBUG
-extension Guardian {
-    static let mock = Guardian(
-        id: "guardian-detail-uuid-001",
-        user: User.mockGuardian,
-        wardEmail: "ward@example.com",
-        wardPhoneNumber: "010-1234-5678",
-        linkedWard: nil
-    )
-}
-#endif

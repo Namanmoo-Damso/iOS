@@ -36,29 +36,3 @@ struct User: Codable, Identifiable, Equatable {
         return lhs.id == rhs.id
     }
 }
-
-// MARK: - Mock Data (테스트용)
-
-#if DEBUG
-extension User {
-    static let mockGuardian = User(
-        id: "guardian-uuid-001",
-        kakaoId: "1234567890",
-        email: "guardian@example.com",
-        nickname: "홍길동",
-        profileImageUrl: "https://example.com/profile.jpg",
-        userType: .guardian,
-        createdAt: Date()
-    )
-
-    static let mockWard = User(
-        id: "ward-uuid-001",
-        kakaoId: "0987654321",
-        email: "ward@example.com",
-        nickname: "어르신",
-        profileImageUrl: nil,
-        userType: .ward,
-        createdAt: Date()
-    )
-}
-#endif

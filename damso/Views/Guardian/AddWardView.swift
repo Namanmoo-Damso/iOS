@@ -99,8 +99,3 @@ struct AddWardView: View {
         }
     }
 }
-
-#Preview {
-    AddWardView()
-        .environmentObject(AppState())
-}

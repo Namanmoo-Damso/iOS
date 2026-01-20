@@ -218,10 +218,3 @@ struct InfoRow: View {
         }
     }
 }
-
-#Preview {
-    NavigationStack {
-        MyProfileView()
-            .environmentObject(AppState())
-    }
-}

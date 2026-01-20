@@ -295,10 +295,3 @@ struct ScheduleDetailEditView: View {
 }
 
 // MARK: - Preview
-
-#Preview {
-    AICallScheduleEditView(
-        scheduleItems: .constant([AICallScheduleItem()]),
-        isEnabled: .constant(true)
-    )
-}

@@ -139,33 +139,3 @@ struct OrganizationSummary: Codable, Identifiable, Equatable {
         return lhs.id == rhs.id
     }
 }
-
-// MARK: - Mock Data (테스트용)
-
-#if DEBUG
-extension GuardianSummary {
-    static let mock = GuardianSummary(
-        id: "guardian-001",
-        userId: nil,
-        nickname: "보호자",
-        profileImageUrl: nil
-    )
-}
-
-extension WardSummary {
-    static let mock = WardSummary(
-        id: "ward-001",
-        userId: nil,
-        nickname: "어르신",
-        profileImageUrl: nil,
-        phoneNumber: "010-1234-5678"
-    )
-}
-
-extension OrganizationSummary {
-    static let mock = OrganizationSummary(
-        id: "org-001",
-        name: "행복요양원"
-    )
-}
-#endif

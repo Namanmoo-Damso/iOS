@@ -85,25 +85,3 @@ enum WardLinkType {
         }
     }
 }
-
-// MARK: - Mock Data (테스트용)
-
-#if DEBUG
-extension Ward {
-    static let mock = Ward(
-        id: "ward-detail-uuid-001",
-        user: User.mockWard,
-        phoneNumber: "010-9876-5432",
-        linkedGuardian: nil,
-        linkedOrganization: nil
-    )
-
-    static let mockLinkedToGuardian = Ward(
-        id: "ward-detail-uuid-002",
-        user: User.mockWard,
-        phoneNumber: "010-9876-5432",
-        linkedGuardian: GuardianSummary.mock,
-        linkedOrganization: nil
-    )
-}
-#endif

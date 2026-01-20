@@ -96,8 +96,3 @@ struct EmergencyButton: View {
         }
     }
 }
-
-#Preview {
-    EmergencyButton()
-        .padding()
-}

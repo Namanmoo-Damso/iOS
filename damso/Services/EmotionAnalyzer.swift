@@ -49,8 +49,11 @@ final class EmotionAnalyzer: ObservableObject {
     /// 분석 주기 (초)
     var analysisInterval: Float = 3.0
 
-    /// 최소 신뢰도 (이 이상이어야 알림 전송)
+    /// 최소 신뢰도 - 일반 감정 (이 이상이어야 알림 전송)
     var minimumConfidence: Float = 0.5
+
+    /// 최소 신뢰도 - 부정적 감정 (더 낮은 임계값으로 민감하게 감지)
+    var minimumConfidenceForNegative: Float = 0.3
 
     /// 부정적 감정만 알림 전송 여부
     var onlyNegativeEmotions: Bool = false
@@ -346,9 +349,13 @@ final class EmotionAnalyzer: ObservableObject {
         self.confidence = confidence
         self.intensity = intensity ?? confidence
 
+        // 부정적 감정은 더 낮은 임계값 적용 (민감하게 감지)
+        let isNegative = isNegativeEmotion(emotion)
+        let requiredConfidence = isNegative ? minimumConfidenceForNegative : minimumConfidence
+
         // 조건 확인: 신뢰도 충족 + (부정적 감정만 또는 모든 감정)
-        let shouldSendAlert = confidence >= minimumConfidence &&
-            (!onlyNegativeEmotions || isNegativeEmotion(emotion))
+        let shouldSendAlert = confidence >= requiredConfidence &&
+            (!onlyNegativeEmotions || isNegative)
 
         if shouldSendAlert {
             sendEmotionAlert(
@@ -428,9 +435,10 @@ final class EmotionAnalyzer: ObservableObject {
     // MARK: - Debug
 
     private func debugLog(_ message: String) {
-        #if DEBUG
+        // Face 로그 비활성화
+        // #if DEBUG
         print("[EmotionAnalyzer] \(message)")
-        #endif
+        // #endif
     }
 }
 

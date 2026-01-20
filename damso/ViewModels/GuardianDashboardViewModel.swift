@@ -73,11 +73,6 @@ final class GuardianDashboardViewModel: ObservableObject {
         } catch {
             errorMessage = "데이터를 불러오는데 실패했습니다"
             print("[GuardianDashboardViewModel] Error: \(error)")
-
-            // 에러 시 Mock 데이터 사용 (개발용)
-            #if DEBUG
-            updateFromResponse(GuardianDashboardResponse.mock)
-            #endif
         }
 
         isLoading = false

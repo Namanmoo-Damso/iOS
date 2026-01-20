@@ -505,16 +505,3 @@ struct FlowLayout: Layout {
         return (CGSize(width: maxWidth, height: y + rowHeight), positions)
     }
 }
-
-#Preview {
-    NavigationStack {
-        CallDetailView(call: RecentCall(
-            id: "1",
-            date: Date(),
-            duration: 12,
-            summary: "어머니께서 오늘 날씨가 좋다고 말씀하시며 산책을 다녀오셨다고 하셨습니다.",
-            tags: ["날씨", "산책", "긍정적"],
-            mood: .positive
-        ))
-    }
-}

@@ -241,7 +241,3 @@ struct WeeklySummaryCard: View {
         )
     }
 }
-
-#Preview {
-    GuardianReportView()
-}

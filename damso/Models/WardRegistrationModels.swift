@@ -405,33 +405,3 @@ struct UpdateScheduleRequest: Codable {
         case schedule
     }
 }
-
-// MARK: - Mock Data
-
-#if DEBUG
-extension WardBasicInfo {
-    static let mock = WardBasicInfo(
-        name: "홍길동",
-        relation: .parent,
-        phoneNumber: "010-1234-5678",
-        birthDate: "19450315",
-        gender: .male,
-        address: "서울시 강남구 테헤란로 123"
-    )
-}
-
-extension AICarInfo {
-    static let mock = AICarInfo(
-        medicalConditions: "고혈압, 당뇨",
-        medications: "혈압약(아침), 당뇨약(아침, 저녁)"
-    )
-}
-
-extension AICallScheduleItem {
-    static let mock = AICallScheduleItem(
-        time: Calendar.current.date(bySettingHour: 10, minute: 0, second: 0, of: Date()) ?? Date(),
-        weekdays: [.monday, .tuesday, .wednesday, .thursday, .friday],
-        isEnabled: true
-    )
-}
-#endif

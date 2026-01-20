@@ -165,6 +165,12 @@ struct ContentView: View {
             if hasDeeplink, let userType = deeplinkManager.requestedUserType {
                 Log.ui.i("Deeplink 수신 - userType: \(userType), shouldAutoTrigger: \(deeplinkManager.shouldAutoTriggerLogin)")
 
+                // 서버 선택 화면에서는 대기 (handleServerSelected에서 처리)
+                if case .serverSelection = navigationState {
+                    Log.ui.i("서버 선택 중 - Deeplink 대기")
+                    return
+                }
+
                 // 이미 로그인된 상태가 아닐 때만 처리
                 let isInMainFlow: Bool
                 if case .main = navigationState { isInMainFlow = true }
@@ -222,9 +228,16 @@ struct ContentView: View {
                 showGlobalCallView = false
             }
             .onAppear {
+                // roomName을 먼저 저장 (clearCall 호출 전에)
+                let roomName = callStateStore.activeCall?.roomName
+
+                // CallKit 상태 정리 - 화면 표시 후 호출
+                // (LiveKitViewModel에서 너무 일찍 호출하면 .onChange가 상태를 놓침)
+                callStateStore.clearCall()
+
                 // 통화 화면 표시 시 자동으로 통화 시작
                 if !callViewModel.isConnected && !callViewModel.isBusy {
-                    if let call = callStateStore.activeCall, let roomName = call.roomName {
+                    if let roomName = roomName {
                         callViewModel.startCall(roomName: roomName)
                     } else {
                         callViewModel.startCall()
@@ -320,20 +333,15 @@ struct ContentView: View {
         // 대기 중인 로그인 상태 클리어
         UserDefaults.standard.clearPendingLoginUserType()
 
-        // Universal Link로 앱이 시작된 경우 확인
-        if deeplinkManager.hasUnhandledDeeplink, let userType = deeplinkManager.requestedUserType {
-            Log.ui.i("Universal Link로 앱 시작됨 - userType: \(userType)")
-            selectedUserType = userType
-            shouldAutoTriggerLogin = deeplinkManager.shouldAutoTriggerLogin
-            deeplinkManager.clearDeeplink()
-            navigationState = .login(userType)
-            return
+        // Universal Link로 앱이 시작된 경우에도 서버 선택 먼저
+        // (서버 선택 완료 후 deeplink 처리는 onChange에서 수행)
+        if deeplinkManager.hasUnhandledDeeplink {
+            Log.ui.i("Universal Link 감지됨 - 서버 선택 후 처리 예정")
         }
 
-        // 서버 선택 화면 건너뛰고 바로 사용자 타입 선택으로 이동
-        // 기본 서버는 AppConfig.serverDomain (1.sodam.store)
-        Log.ui.i("사용자 타입 선택 화면으로 이동 (기본 서버: \(AppConfig.serverDomain))")
-        handleServerSelected()
+        // 서버 선택 화면으로 이동
+        Log.ui.i("서버 선택 화면으로 이동")
+        navigationState = .serverSelection
     }
 
     private func handleLoginSuccess(userType: UserType, loginResult: KakaoLoginResult) {
@@ -541,7 +549,7 @@ struct ContentView: View {
 
     private func handleServerSelected() {
         Task {
-            Log.ui.i("서버 선택 완료 - 인증 상태 확인 중...")
+            Log.ui.i("서버 선택 완료 (서버: \(AppConfig.serverDomain)) - 인증 상태 확인 중...")
             await appState.checkAuthStatus()
 
             if appState.isAuthenticated {
@@ -555,7 +563,17 @@ struct ContentView: View {
                     Log.ui.w("기존 토큰 발견 - 삭제 (인증 실패 상태에서 토큰이 남아있음)")
                     TokenManager.shared.clearTokens()
                 }
-                navigationState = .userTypeSelection
+
+                // Deeplink가 있으면 해당 userType으로 바로 로그인 화면으로 이동
+                if deeplinkManager.hasUnhandledDeeplink, let userType = deeplinkManager.requestedUserType {
+                    Log.ui.i("Deeplink 처리 - userType: \(userType), shouldAutoTrigger: \(deeplinkManager.shouldAutoTriggerLogin)")
+                    selectedUserType = userType
+                    shouldAutoTriggerLogin = deeplinkManager.shouldAutoTriggerLogin
+                    deeplinkManager.clearDeeplink()
+                    navigationState = .login(userType)
+                } else {
+                    navigationState = .userTypeSelection
+                }
             }
         }
     }
@@ -635,9 +653,4 @@ struct ContentView: View {
         navigationState = .inviteCompletion(inviteInfo)
     }
 
-}
-
-#Preview {
-    ContentView()
-        .environmentObject(DeeplinkManager.shared)
 }

@@ -37,21 +37,3 @@ struct QuickLinkButton: View {
         .buttonStyle(.plain)
     }
 }
-
-#Preview {
-    HStack(spacing: 16) {
-        QuickLinkButton(
-            icon: "person.fill",
-            title: "내 정보",
-            color: .blue
-        ) {}
-
-        QuickLinkButton(
-            icon: "heart.fill",
-            title: "건강 기록",
-            color: .pink
-        ) {}
-    }
-    .padding()
-    .background(Color(.systemGroupedBackground))
-}

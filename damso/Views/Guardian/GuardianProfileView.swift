@@ -126,10 +126,3 @@ struct GuardianProfileView: View {
         }
     }
 }
-
-#Preview {
-    NavigationStack {
-        GuardianProfileView()
-            .environmentObject(AppState())
-    }
-}

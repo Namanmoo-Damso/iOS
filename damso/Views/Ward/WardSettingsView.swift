@@ -340,8 +340,3 @@ struct WardSettingsView: View {
         .listRowBackground(Color.white)
     }
 }
-
-#Preview {
-    WardSettingsView()
-        .environmentObject(AppState())
-}

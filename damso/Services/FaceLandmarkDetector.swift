@@ -145,9 +145,10 @@ final class FaceLandmarkDetector: ObservableObject {
             ? CGSize(width: frameHeight, height: frameWidth)  // 회전된 크기
             : CGSize(width: frameWidth, height: frameHeight)
 
-        #if DEBUG
-        print("[FaceLandmarkDetector] 📍 Processing frame - raw: \(Int(frameWidth))x\(Int(frameHeight)), effective: \(Int(effectiveSize.width))x\(Int(effectiveSize.height))")
-        #endif
+        // Face 로그 비활성화
+        // #if DEBUG
+        // print("[FaceLandmarkDetector] 📍 Processing frame - raw: \(Int(frameWidth))x\(Int(frameHeight)), effective: \(Int(effectiveSize.width))x\(Int(effectiveSize.height))")
+        // #endif
 
         // 비디오 프레임 크기 업데이트 (Vision 좌표 기준 크기)
         Task { @MainActor [weak self] in
@@ -173,34 +174,38 @@ final class FaceLandmarkDetector: ObservableObject {
 
             guard let observations = request.results,
                   let face = observations.first else {
-                #if DEBUG
-                print("[FaceLandmarkDetector] 📍 No face detected")
-                #endif
+                // Face 로그 비활성화
+                // #if DEBUG
+                // print("[FaceLandmarkDetector] 📍 No face detected")
+                // #endif
                 Task { @MainActor [weak self] in
                     self?.updateResults(landmarks: [], detected: false)
                 }
                 return
             }
 
-            #if DEBUG
-            print("[FaceLandmarkDetector] 📍 Face detected! boundingBox: \(face.boundingBox)")
-            #endif
+            // Face 로그 비활성화
+            // #if DEBUG
+            // print("[FaceLandmarkDetector] 📍 Face detected! boundingBox: \(face.boundingBox)")
+            // #endif
 
             // 랜드마크 추출 (nonisolated 함수에서 호출)
             let landmarks = extractLandmarksSync(from: face)
 
-            #if DEBUG
-            print("[FaceLandmarkDetector] 📍 Extracted \(landmarks.count) landmarks")
-            #endif
+            // Face 로그 비활성화
+            // #if DEBUG
+            // print("[FaceLandmarkDetector] 📍 Extracted \(landmarks.count) landmarks")
+            // #endif
 
             // 결과를 MainActor로 전달
             Task { @MainActor [weak self] in
                 self?.updateResults(landmarks: landmarks, detected: !landmarks.isEmpty)
             }
         } catch {
-            #if DEBUG
-            print("[FaceLandmarkDetector] Vision processing failed: \(error)")
-            #endif
+            // Face 로그 비활성화
+            // #if DEBUG
+            // print("[FaceLandmarkDetector] Vision processing failed: \(error)")
+            // #endif
         }
     }
 
@@ -321,9 +326,10 @@ final class FaceLandmarkDetector: ObservableObject {
     // MARK: - Debug
 
     private func debugLog(_ message: String) {
-        #if DEBUG
-        print("[FaceLandmarkDetector] \(message)")
-        #endif
+        // Face 로그 비활성화
+        // #if DEBUG
+        // print("[FaceLandmarkDetector] \(message)")
+        // #endif
     }
 }
 
@@ -346,21 +352,24 @@ final class FaceLandmarkVideoRenderer: NSObject, VideoRenderer {
 
     // @objc 필수 - VideoRenderer 프로토콜의 render(frame:)이 @objc optional이므로
     @objc nonisolated func render(frame: VideoFrame) {
-        #if DEBUG
-        print("[FaceLandmarkVideoRenderer] 🎬 render() called - dimensions: \(frame.dimensions)")
-        #endif
+        // Face 로그 비활성화
+        // #if DEBUG
+        // print("[FaceLandmarkVideoRenderer] 🎬 render() called - dimensions: \(frame.dimensions)")
+        // #endif
 
         // VideoFrame에서 CVPixelBuffer 추출 (toCVPixelBuffer() 메서드 사용)
         guard let pixelBuffer = frame.toCVPixelBuffer() else {
-            #if DEBUG
-            print("[FaceLandmarkVideoRenderer] ❌ Failed to get CVPixelBuffer from VideoFrame")
-            #endif
+            // Face 로그 비활성화
+            // #if DEBUG
+            // print("[FaceLandmarkVideoRenderer] ❌ Failed to get CVPixelBuffer from VideoFrame")
+            // #endif
             return
         }
 
-        #if DEBUG
-        print("[FaceLandmarkVideoRenderer] ✅ Got CVPixelBuffer, calling onFrame")
-        #endif
+        // Face 로그 비활성화
+        // #if DEBUG
+        // print("[FaceLandmarkVideoRenderer] ✅ Got CVPixelBuffer, calling onFrame")
+        // #endif
         onFrame(pixelBuffer)
     }
 }

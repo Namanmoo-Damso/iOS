@@ -41,8 +41,3 @@ struct GuardianTabView: View {
         .tint(.damsoGreen)
     }
 }
-
-#Preview {
-    GuardianTabView()
-        .environmentObject(AppState())
-}

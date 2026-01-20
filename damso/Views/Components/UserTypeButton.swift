@@ -82,30 +82,3 @@ struct UserTypeButton: View {
         }
     }
 }
-
-#Preview {
-    VStack(spacing: 20) {
-        HStack(spacing: 16) {
-            UserTypeButton(
-                type: .guardian,
-                title: "보호자",
-                icon: "person.badge.shield.checkmark",
-                subtitle: "어르신을 돌보는 분",
-                isSelected: true
-            ) {
-                print("Guardian selected")
-            }
-
-            UserTypeButton(
-                type: .ward,
-                title: "어르신",
-                icon: "person.fill",
-                subtitle: "케어를 받는 분",
-                isSelected: false
-            ) {
-                print("Ward selected")
-            }
-        }
-        .padding()
-    }
-}

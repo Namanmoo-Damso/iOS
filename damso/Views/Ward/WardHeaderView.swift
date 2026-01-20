@@ -61,20 +61,3 @@ struct WardHeaderView: View {
         .padding(.vertical, 8)
     }
 }
-
-#Preview {
-    VStack {
-        WardHeaderView(user: nil)
-        WardHeaderView(user: UserMeResponse(
-            id: "1",
-            kakaoId: "123",
-            email: "test@test.com",
-            nickname: "김영희",
-            profileImageUrl: nil,
-            userType: .ward,
-            createdAt: Date(),
-            guardianInfo: nil,
-            wardInfo: nil
-        ))
-    }
-}

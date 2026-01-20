@@ -50,8 +50,8 @@ struct damsoApp: App {
 final class DeeplinkManager: ObservableObject {
     static let shared = DeeplinkManager()
 
-    /// Universal Link 도메인
-    private static let universalLinkHost = "1.sodam.store"
+    /// 유효한 Universal Link 도메인 목록
+    private static let validHosts = ["sodam.store", "1.sodam.store", "2.sodam.store", "3.sodam.store", "4.sodam.store", "5.sodam.store"]
 
     /// 딥링크로 요청된 사용자 타입
     @Published var requestedUserType: UserType?
@@ -95,12 +95,16 @@ final class DeeplinkManager: ObservableObject {
         }
     }
 
-    /// Universal Link URL 처리 (https://1.sodam.store/)
+    /// Universal Link URL 처리 (https://*.sodam.store/)
     func handleUniversalLink(url: URL) {
-        guard let host = url.host, host == Self.universalLinkHost else {
+        guard let host = url.host, Self.validHosts.contains(host) else {
             print("[DeeplinkManager] Universal Link 도메인 불일치: \(url.host ?? "nil")")
             return
         }
+
+        // 딥링크로 들어온 도메인을 서버로 설정
+        AppConfig.serverDomain = host
+        print("[DeeplinkManager] 서버 도메인 설정: \(host)")
 
         let path = url.path
         let queryItems = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems

@@ -120,9 +120,3 @@ struct NotificationSettingsView: View {
         #endif
     }
 }
-
-#Preview {
-    NavigationStack {
-        NotificationSettingsView()
-    }
-}

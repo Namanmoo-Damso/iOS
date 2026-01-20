@@ -606,16 +606,3 @@ struct ScheduleItemRow: View {
 }
 
 // MARK: - Preview
-
-#Preview {
-    GuardianRegistrationView(
-        kakaoUserInfo: KakaoUserInfo(
-            id: 12345,
-            nickname: "홍길동",
-            email: "hong@email.com",
-            profileImageUrl: nil
-        ),
-        onRegistrationComplete: { _, _ in }
-    )
-    .environmentObject(AppState())
-}

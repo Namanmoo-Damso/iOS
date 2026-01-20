@@ -558,10 +558,3 @@ struct ConversationSummaryCard: View {
 }
 
 // MARK: - Preview
-
-#Preview {
-    NavigationStack {
-        GuardianHomeView()
-            .environmentObject(AppState())
-    }
-}

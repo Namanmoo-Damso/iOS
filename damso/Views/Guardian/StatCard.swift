@@ -61,33 +61,3 @@ struct StatCard: View {
         )
     }
 }
-
-#Preview {
-    HStack(spacing: 12) {
-        StatCard(
-            title: "총 대화 수",
-            value: "24",
-            change: "+3",
-            icon: "phone.fill",
-            color: .blue
-        )
-
-        StatCard(
-            title: "평균 시간",
-            value: "11분",
-            subtitle: "대화당",
-            icon: "clock.fill",
-            color: .orange
-        )
-
-        StatCard(
-            title: "전반적 기분",
-            value: "긍정적",
-            subtitle: "85%",
-            icon: "face.smiling.fill",
-            color: .green
-        )
-    }
-    .padding()
-    .background(Color(.systemGroupedBackground))
-}

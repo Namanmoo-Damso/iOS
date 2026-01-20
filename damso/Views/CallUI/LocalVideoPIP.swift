@@ -207,18 +207,4 @@ struct LocalVideoPIP: View {
             }
         }
     }
-}
-
-#Preview {
-    ZStack {
-        Color.gray
-        LocalVideoPIP(
-            track: nil,
-            isCameraEnabled: false,
-            isMicEnabled: false,
-            isExpanded: .constant(true),
-            showMesh: .constant(true)
-        )
-    }
-}
-#endif
+}#endif

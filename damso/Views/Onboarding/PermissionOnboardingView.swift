@@ -285,9 +285,3 @@ struct Triangle: Shape {
 }
 
 // MARK: - Preview
-
-#Preview {
-    PermissionOnboardingView(userType: .ward) {
-        print("완료")
-    }
-}

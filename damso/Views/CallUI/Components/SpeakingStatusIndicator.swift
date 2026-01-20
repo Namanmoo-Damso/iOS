@@ -104,16 +104,3 @@ struct SpeakingStatusIndicator: View {
         }
     }
 }
-
-#Preview("Speaking Status") {
-    ZStack {
-        Color(hex: "1C1C1E")
-            .ignoresSafeArea()
-
-        VStack(spacing: 20) {
-            SpeakingStatusIndicator(status: .listening)
-            SpeakingStatusIndicator(status: .talking)
-            SpeakingStatusIndicator(status: .idle)
-        }
-    }
-}
