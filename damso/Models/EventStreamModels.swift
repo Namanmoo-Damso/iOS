@@ -202,41 +202,7 @@ enum SSECareAlertType: String, Codable, CaseIterable {
 
 // MARK: - 알림 심각도
 
-/// 알림 심각도 enum
-enum AlertSeverity: String, Codable, CaseIterable {
-    case low
-    case medium
-    case high
-    case critical
-
-    /// 표시용 문자열
-    var displayName: String {
-        switch self {
-        case .low:
-            return "낮음"
-        case .medium:
-            return "보통"
-        case .high:
-            return "높음"
-        case .critical:
-            return "긴급"
-        }
-    }
-
-    /// 우선순위 (높을수록 긴급)
-    var priority: Int {
-        switch self {
-        case .low:
-            return 1
-        case .medium:
-            return 2
-        case .high:
-            return 3
-        case .critical:
-            return 4
-        }
-    }
-}
+// Note: AlertSeverity is defined in AlertDTOs.swift
 
 // MARK: - 위치 데이터
 

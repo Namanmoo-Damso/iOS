@@ -245,7 +245,7 @@ final class RegistrationService: RegistrationProtocol {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
 
-        let requestBody = ScheduleRequest(schedule: schedule, wardId: wardId)
+        let requestBody = ScheduleSaveRequest(schedule: schedule, wardId: wardId)
 
         do {
             let jsonData = try JSONEncoder().encode(requestBody)

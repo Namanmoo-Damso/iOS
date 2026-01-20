@@ -11,7 +11,7 @@ import Charts
 /// 통계 상세 페이지
 struct StatisticsDetailView: View {
     let statisticType: StatisticType
-    let viewModel: GuardianDashboardViewModel
+    let viewModel: GuardianHomeViewModel
 
     enum StatisticType {
         case totalCalls

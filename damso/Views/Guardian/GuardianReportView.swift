@@ -16,17 +16,38 @@ struct GuardianReportView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
-                    // 감정 추이 차트
-                    EmotionTrendChart(data: viewModel.emotionTrend)
+                    if let report = viewModel.reportData {
+                        // 감정 추이 차트
+                        EmotionTrendChart(data: report.emotionTrend)
 
-                    // 건강 키워드
-                    if let keywords = viewModel.healthKeywords {
-                        HealthKeywordsCard(keywords: keywords)
-                    }
+                        // 건강 키워드
+                        HealthKeywordsCard(keywords: report.healthKeywords)
 
-                    // 주간 요약
-                    if !viewModel.weeklySummary.isEmpty {
-                        WeeklySummaryCard(summary: viewModel.weeklySummary)
+                        // 주간 요약
+                        if !report.weeklySummary.isEmpty {
+                            WeeklySummaryCard(summary: report.weeklySummary)
+                        }
+                    } else if viewModel.isLoading {
+                        ProgressView()
+                            .padding(.top, 50)
+                    } else {
+                        // 데이터 없음 or 에러
+                        VStack(spacing: 12) {
+                            Text("데이터를 불러올 수 없습니다")
+                                .foregroundColor(.secondary)
+                            if let error = viewModel.errorMessage {
+                                Text(error)
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                            }
+                            Button("다시 시도") {
+                                Task {
+                                    await viewModel.fetchReport()
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                        .padding(.top, 50)
                     }
                 }
                 .padding()

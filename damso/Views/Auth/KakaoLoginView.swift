@@ -1,12 +1,12 @@
 import SwiftUI
 
 struct KakaoLoginView: View {
-    @ObservedObject var kakaoAuth = KakaoAuthService.shared
+    @StateObject private var viewModel = LoginViewModel()
     let onLoginSuccess: (KakaoLoginResult) -> Void
 
     /// Universal Link에서 진입 시 자동으로 카카오 로그인 트리거
     var autoTriggerLogin: Bool = false
-
+    
     @State private var hasCalledLoginSuccess = false
     @State private var hasTriggeredAutoLogin = false
 
@@ -33,7 +33,7 @@ struct KakaoLoginView: View {
 
             // Login section
             VStack(spacing: 20) {
-                if kakaoAuth.isLoading {
+                if viewModel.isLoading {
                     ProgressView()
                         .scaleEffect(1.2)
                 } else {
@@ -57,7 +57,7 @@ struct KakaoLoginView: View {
                     .padding(.horizontal, 40)
                 }
 
-                if let error = kakaoAuth.errorMessage {
+                if let error = viewModel.errorMessage {
                     Text(error)
                         .font(.caption)
                         .foregroundColor(.red)
@@ -72,7 +72,7 @@ struct KakaoLoginView: View {
         .background(Color(.systemGroupedBackground))
         .onAppear {
             // Universal Link로 진입 시 자동 로그인 트리거
-            if autoTriggerLogin && !hasTriggeredAutoLogin && !kakaoAuth.isLoading {
+            if autoTriggerLogin && !hasTriggeredAutoLogin && !viewModel.isLoading {
                 hasTriggeredAutoLogin = true
                 print("[KakaoLoginView] 🔗 Universal Link - 자동 로그인 트리거")
                 triggerKakaoLogin()
@@ -87,22 +87,17 @@ struct KakaoLoginView: View {
             return
         }
 
-        Task {
-            do {
-                print("[KakaoLoginView] 🔵 kakaoAuth.login() 호출 시작")
-                let result = try await kakaoAuth.login()
-                print("[KakaoLoginView] ✅ 카카오 로그인 성공: \(result.userInfo.nickname ?? "unknown")")
+        print("[KakaoLoginView] 🔵 viewModel.loginWithKakao() 호출 시작")
+        viewModel.loginWithKakao { result in
+            print("[KakaoLoginView] ✅ 카카오 로그인 성공: \(result.userInfo.nickname ?? "unknown")")
 
-                guard !hasCalledLoginSuccess else {
-                    print("[KakaoLoginView] 🚫 이미 onLoginSuccess 호출됨 - 스킵")
-                    return
-                }
-                hasCalledLoginSuccess = true
-                print("[KakaoLoginView] 🔵 onLoginSuccess 콜백 호출")
-                onLoginSuccess(result)
-            } catch {
-                print("[KakaoLoginView] ❌ 카카오 로그인 실패: \(error)")
+            guard !hasCalledLoginSuccess else {
+                print("[KakaoLoginView] 🚫 이미 onLoginSuccess 호출됨 - 스킵")
+                return
             }
+            hasCalledLoginSuccess = true
+            print("[KakaoLoginView] 🔵 onLoginSuccess 콜백 호출")
+            onLoginSuccess(result)
         }
     }
 }

@@ -7,26 +7,9 @@
 
 import SwiftUI
 
-/// 기간 필터 타입
-enum PeriodFilter: String, CaseIterable {
-    case today = "오늘"
-    case week = "이번 주"
-    case month = "이번 달"
-    
-    /// 서버 API에 전달할 값
-    var apiValue: String {
-        switch self {
-        case .today: return "today"
-        case .week: return "week"
-        case .month: return "month"
-        }
-    }
-}
-
-/// 보호자 홈 화면 (대시보드)
 struct GuardianHomeView: View {
     @EnvironmentObject var appState: AppState
-    @StateObject private var viewModel = GuardianDashboardViewModel()
+    @StateObject private var viewModel = GuardianHomeViewModel()
     @State private var selectedPeriod: PeriodFilter = .today
 
     var body: some View {

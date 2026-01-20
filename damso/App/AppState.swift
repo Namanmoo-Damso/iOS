@@ -11,6 +11,10 @@ import Combine
 /// 앱 전역 상태 관리
 @MainActor
 final class AppState: ObservableObject {
+    
+    // MARK: - Singleton
+    
+    static let shared = AppState()
 
     // MARK: - Published Properties
 

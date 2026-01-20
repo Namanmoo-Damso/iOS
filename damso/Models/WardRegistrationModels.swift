@@ -285,8 +285,8 @@ struct AICallSchedule: Codable, Equatable {
 
 // MARK: - 어르신 등록 전체 요청
 
-/// 어르신 등록 요청 (보호자가 제출)
-struct WardRegistrationRequest: Codable {
+/// 어르신 등록 요청 (보호자가 제출) - 온보딩용
+struct WardOnboardingRequest: Codable {
     let basicInfo: WardBasicInfo
     let aiCareInfo: AICarInfo?
     let callSchedule: AICallSchedule?
@@ -349,10 +349,10 @@ struct ScheduleItemResponse: Codable {
     }
 }
 
-/// 스케줄 저장 요청
-struct ScheduleRequest: Codable {
+/// AI 스케줄 저장 요청 (슌롯 기반)
+struct AIScheduleRequest: Codable {
     let wardId: String?         // 다중 어르신 지원: 대상 어르신 ID
-    let items: [ScheduleItemRequest]
+    let items: [AIScheduleItemRequest]
     let isEnabled: Bool
 
     enum CodingKeys: String, CodingKey {
@@ -363,13 +363,13 @@ struct ScheduleRequest: Codable {
 
     init(schedule: AICallSchedule, wardId: String? = nil) {
         self.wardId = wardId
-        self.items = schedule.items.map { ScheduleItemRequest(item: $0) }
+        self.items = schedule.items.map { AIScheduleItemRequest(item: $0) }
         self.isEnabled = schedule.isEnabled
     }
 }
 
-/// 스케줄 항목 저장 요청 (슬롯 기반)
-struct ScheduleItemRequest: Codable {
+/// AI 스케줄 항목 저장 요청 (슬롯 기반)
+struct AIScheduleItemRequest: Codable {
     let id: String
     let slotStartHour: Int      // 0-23
     let slotStartMinute: Int    // 0, 10, 20, 30, 40, 50

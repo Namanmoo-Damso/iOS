@@ -15,7 +15,7 @@ struct PermissionOnboardingView: View {
     let userType: UserType
     let onComplete: () -> Void
 
-    @State private var isRequesting = false
+    @StateObject private var viewModel = OnboardingViewModel()
 
     var body: some View {
         ZStack {
@@ -114,9 +114,11 @@ struct PermissionOnboardingView: View {
             VStack {
                 Spacer()
 
-                Button(action: requestAllPermissions) {
+                Button(action: {
+                    viewModel.requestAllPermissions(userType: userType, completion: onComplete)
+                }) {
                     HStack {
-                        if isRequesting {
+                        if viewModel.isRequesting {
                             ProgressView()
                                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 .scaleEffect(0.9)
@@ -131,7 +133,7 @@ struct PermissionOnboardingView: View {
                     .foregroundColor(.white)
                     .cornerRadius(16)
                 }
-                .disabled(isRequesting)
+                .disabled(viewModel.isRequesting)
                 .padding(.horizontal, 20)
                 .padding(.bottom, 34)
                 .background(
@@ -204,70 +206,6 @@ struct PermissionOnboardingView: View {
                 .fill(Color.white)
                 .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
         )
-    }
-
-    // MARK: - Permission Request
-
-    private func requestAllPermissions() {
-        isRequesting = true
-
-        Task {
-            // 1. 카메라 권한
-            await requestCameraPermission()
-
-            // 2. 마이크 권한
-            await requestMicrophonePermission()
-
-            // 3. 알림 권한
-            await requestNotificationPermission()
-
-            // 4. 위치 권한 (어르신만)
-            if userType == .ward {
-                requestLocationPermission()
-            }
-
-            // 완료 플래그 저장
-            UserDefaults.standard.permissionOnboardingCompleted = true
-
-            await MainActor.run {
-                isRequesting = false
-                onComplete()
-            }
-        }
-    }
-
-    private func requestCameraPermission() async {
-        await withCheckedContinuation { continuation in
-            AVCaptureDevice.requestAccess(for: .video) { _ in
-                continuation.resume()
-            }
-        }
-    }
-
-    private func requestMicrophonePermission() async {
-        await withCheckedContinuation { continuation in
-            AVCaptureDevice.requestAccess(for: .audio) { _ in
-                continuation.resume()
-            }
-        }
-    }
-
-    private func requestNotificationPermission() async {
-        await withCheckedContinuation { continuation in
-            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
-                // 권한 허용 시 원격 알림 등록
-                if granted {
-                    DispatchQueue.main.async {
-                        UIApplication.shared.registerForRemoteNotifications()
-                    }
-                }
-                continuation.resume()
-            }
-        }
-    }
-
-    private func requestLocationPermission() {
-        LocationService.shared.requestAuthorization()
     }
 }
 

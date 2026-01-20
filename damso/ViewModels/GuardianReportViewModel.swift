@@ -2,102 +2,55 @@
 //  GuardianReportViewModel.swift
 //  damso
 //
-//  Created by Claude Code on 2024-12-30.
+//  보호자 리포트 화면 ViewModel
 //
 
 import Foundation
+import Combine
 
-/// 보호자 분석 보고서 뷰모델
 @MainActor
 final class GuardianReportViewModel: ObservableObject {
-
+    
     // MARK: - Published Properties
-
-    @Published var isLoading = false
+    
+    @Published var isLoading: Bool = false
+    @Published var reportData: GuardianReportResponse?
+    @Published var selectedDate: Date = Date()
     @Published var errorMessage: String?
-
-    // 감정 추이
-    @Published var emotionTrend: [EmotionDataPoint] = []
-
-    // 건강 키워드
-    @Published var healthKeywords: HealthKeywords?
-
-    // 주간 요약
-    @Published var weeklySummary: String = ""
-
+    
     // MARK: - Dependencies
-
-    private var authService: AuthService {
-        AuthService.shared
+    private let guardianRepository: GuardianRepositoryProtocol
+    
+    // MARK: - Initialization
+    
+    init(guardianRepository: GuardianRepositoryProtocol = GuardianRepository.shared) {
+        self.guardianRepository = guardianRepository
+        // 초기 로딩은 View에서 task로 실행하는 것이 좋음 (init에서 호출하면 테스팅 어려움)
     }
-
+    
     // MARK: - Public Methods
-
-    /// 보고서 데이터 로드
+    
     func fetchReport() async {
         isLoading = true
         errorMessage = nil
-
+        
         do {
-            let report = try await fetchReportFromServer()
-            updateFromResponse(report)
+            // 날짜 포맷팅 등은 필요 시 추가 (현재는 API가 처리한다고 가정하거나 파라미터 없음)
+            let response = try await guardianRepository.fetchReport(wardId: nil, startDate: nil, endDate: nil)
+            reportData = response
+            
         } catch {
-            errorMessage = "보고서를 불러오는데 실패했습니다"
-            print("[GuardianReportViewModel] Error: \(error)")
+            errorMessage = "리포트를 불러오는데 실패했습니다: \(error.localizedDescription)"
+            
+            // TODO: 개발 중에는 Mock Data라도 보여줄지 결정
+            // loadMockData()
         }
-
+        
         isLoading = false
     }
-
-    // MARK: - Private Methods
-
-    private func fetchReportFromServer() async throws -> GuardianReportResponse {
-        guard let accessToken = TokenManager.shared.accessToken else {
-            throw AuthError.missingAuthToken
-        }
-
-        guard let url = URL(string: "\(AppConfig.apiBaseURL)/v1/guardian/report?period=week") else {
-            throw AuthError.networkError("Invalid report URL")
-        }
-
-        var request = URLRequest(url: url, cachePolicy: .useProtocolCachePolicy, timeoutInterval: Numbers.Timeout.networkRequest)
-        request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-
-        let data: Data
-        let response: URLResponse
-
-        do {
-            (data, response) = try await URLSession.shared.data(for: request)
-        } catch {
-            throw AuthError.networkError(error.localizedDescription)
-        }
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw AuthError.invalidResponse
-        }
-
-        if httpResponse.statusCode == 401 {
-            throw AuthError.unauthorized
-        }
-
-        guard (200..<300).contains(httpResponse.statusCode) else {
-            let bodyText = String(data: data, encoding: .utf8) ?? ""
-            throw AuthError.httpStatus(code: httpResponse.statusCode, body: bodyText)
-        }
-
-        do {
-            return try JSONDecoder.apiDecoder.decode(GuardianReportResponse.self, from: data)
-        } catch {
-            Log.auth.e("Report decoding error: \(error)")
-            throw AuthError.decodingError(error.localizedDescription)
-        }
-    }
-
-    private func updateFromResponse(_ response: GuardianReportResponse) {
-        emotionTrend = response.emotionTrend
-        healthKeywords = response.healthKeywords
-        weeklySummary = response.weeklySummary
+    
+    // 개발용 Mock Data
+    private func loadMockData() {
+        // ...
     }
 }
