@@ -24,7 +24,7 @@ final class InviteCompletionViewModel: ObservableObject {
     // MARK: - Public Methods
     
     func loadWardInfo() {
-        if let ward = AppState.shared.currentUser?.wardInfo {
+        if AppState.shared.currentUser?.wardInfo != nil {
             // 어르신 이름이 별도로 없으면 닉네임 사용
             // 현재 구조상 GuardInfo에 nickname이 없음, UserInfo에서 가져와야 함
             // API 구조 개선 필요, 우선 임시 처리

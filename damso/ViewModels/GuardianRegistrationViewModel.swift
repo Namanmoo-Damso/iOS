@@ -23,13 +23,13 @@ final class GuardianRegistrationViewModel: ObservableObject {
     
     // MARK: - Dependencies
     
-    private let authService: AuthService
+    private let authRepository: AuthRepositoryProtocol
     private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Initialization
     
-    init(authService: AuthService = .shared) {
-        self.authService = authService
+    init(authRepository: AuthRepositoryProtocol = AuthRepository.shared) {
+        self.authRepository = authRepository
     }
     
     // MARK: - Public Methods
@@ -41,7 +41,11 @@ final class GuardianRegistrationViewModel: ObservableObject {
         errorMessage = nil
         
         do {
-            let response = try await authService.registerGuardian(
+            // AuthRepository의 registerGuardian 사용
+            // Note: tempToken이 필요하지만 현재 로직에서는 사용하지 않음
+            // 실제 구현 시 tempToken 처리 필요
+            let response = try await authRepository.registerGuardian(
+                tempToken: "", // TODO: tempToken 처리
                 wardEmail: wardEmail,
                 wardPhoneNumber: wardPhoneNumber
             )

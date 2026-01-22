@@ -43,17 +43,13 @@ final class CallHistoryViewModel: ObservableObject {
     func loadCalls() async {
         isLoading = true
         errorMessage = nil
-        
-        do {
-            // TODO: API 연동 시 실제 호출로 변경
-            // calls = try await callService.fetchCallHistory()
-            
-            // 현재는 빈 배열 (API 연동 전)
-            calls = []
-        } catch {
-            errorMessage = "통화 기록을 불러오는데 실패했습니다."
-        }
-        
+
+        // TODO: API 연동 시 실제 호출로 변경
+        // calls = try await callService.fetchCallHistory()
+
+        // 현재는 빈 배열 (API 연동 전)
+        calls = []
+
         isLoading = false
     }
     

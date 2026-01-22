@@ -77,7 +77,8 @@ struct ConnectionQualityIndicator: View {
         case .good: return 2
         case .poor: return 1
         case .lost: return 0
-        default: return 2
+        case .unknown: return 3  // unknown은 excellent로 표시 (초기 상태)
+        @unknown default: return 3
         }
     }
 
@@ -87,7 +88,8 @@ struct ConnectionQualityIndicator: View {
         case .good: return .yellow
         case .poor: return .orange
         case .lost: return .red
-        default: return .cyan
+        case .unknown: return .green  // unknown은 green으로 표시
+        @unknown default: return .green
         }
     }
 }

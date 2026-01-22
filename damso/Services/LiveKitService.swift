@@ -17,9 +17,6 @@ final class LiveKitService: NSObject, ObservableObject, LiveKitServiceProtocol {
     @Published var remoteParticipantDisconnected: Bool = false
     @Published var remoteDisconnectTimeRemaining: Int = 0
 
-    // 오디오 시각화
-    let audioVisualizer = AudioVisualizerManager.shared
-
     // 실시간 자막
     let transcription = TranscriptionManager.shared
 
@@ -32,14 +29,8 @@ final class LiveKitService: NSObject, ObservableObject, LiveKitServiceProtocol {
     // Care alert service (낙상/음성/감정 알림)
     let careAlertService = CareAlertService.shared
 
-    // User audio level monitor (큰 소리 감지)
-    let userAudioMonitor = UserAudioLevelMonitor.shared
-
-    // Person fall detector (카메라 기반 사람 낙상 감지)
-    let personFallDetector = PersonFallDetector.shared
-
-    // Emotion analyzer (감정 분석)
-    let emotionAnalyzer = EmotionAnalyzer.shared
+    // Call Session Manager (센서 서비스 생명주기 관리)
+    private let callSessionManager = CallSessionManager.shared
     private let defaultRemoteAudioVolume: Double = 1.0
     private let remoteAudioMutedVolume: Double = 0.0
     private var isRemoteAudioEnabled: Bool = true
@@ -173,28 +164,56 @@ final class LiveKitService: NSObject, ObservableObject, LiveKitServiceProtocol {
             highpassFilter: true,
             typingNoiseDetection: true  // 저주파 노이즈 제거
         )
-
-        // ✅ Simulcast 설정: 1080p(메인) + 720p, 360p 하위 레이어
-        let videoPublishOptions = VideoPublishOptions(
-            encoding: VideoEncoding(
-                maxBitrate: 5_000_000,  // 5Mbps (고품질)
-                maxFps: 30
-            ),
-            simulcast: true,
-            simulcastLayers: [
-                VideoParameters.presetH360_169,  // 360p (~400kbps)
-                VideoParameters.presetH720_169   // 720p (~1.7Mbps)
-            ],
-            degradationPreference: .maintainResolution
+        
+        // 음성 통화 품질 개선 (Hi-Fi보다는 음성 최적화)
+        let audioPublishOptions = AudioPublishOptions(
+            encoding: .presetSpeech,  // 24kbps - 음성 통화 최적화
+            dtx: true,   // 무음 시 대역폭 절약
+            red: true    // 패킷 손실 시 오디오 복구 (끊김 방지)
         )
 
+        // ✅ 비디오 인코딩 설정
+        let networkMonitor = NetworkMonitor.shared
+        let isWiFi = networkMonitor.connectionType == .wifi || networkMonitor.connectionType == .wired
+        
+        // 네트워크 타입별 비트레이트 설정
+        // WiFi/Cellular 모두 15Mbps (최고화질, 방송 수준)
+        let maxBitrate = 15_000_000
+        let maxFps = 60  // WiFi, Cellular 모두 60fps
+        let _: VideoParameters = isWiFi ? .presetH1080_169 : .presetH360_169  // WiFi: 1080p, Cellular: 360p
+        
+        debugLog("📶 [CONNECT] Network: \(networkMonitor.connectionType), bitrate: \(maxBitrate / 1_000_000)Mbps, fps: \(maxFps)")
+        
+        // VP9 + SVC (Scalable Video Coding) 설정
+        // - VP9 선택 시 L3T3_KEY 모드 자동 활성화 (3 spatial + 3 temporal layers)
+        // - 즉시 레이어 전환 가능 (키프레임 대기 불필요)
+        // - H.264 Simulcast 대비 20-30% 대역폭 절약
+        // - A14 Bionic (iPhone 12+) 하드웨어 가속 지원
+        let videoPublishOptions = VideoPublishOptions(
+            encoding: VideoEncoding(
+                maxBitrate: maxBitrate,
+                maxFps: maxFps
+            ),
+            simulcast: false,  // VP9 SVC와 simulcast는 상호 배타적
+            preferredCodec: .vp9,  // ⭐ VP9 선택 → SVC L3T3_KEY 자동 활성화
+            preferredBackupCodec: .vp8,  // 호환성 백업 코덱
+            degradationPreference: .balanced  // 네트워크 나쁘면 해상도/프레임 모두 조정
+        )
+        
+        // 카메라 캡처 해상도 설정 (WiFi: 1080p, Cellular: 720p)
+        let initialResolution: Dimensions = isWiFi ? .h1080_169 : .h720_169
+        let cameraCaptureOptions = CameraCaptureOptions(dimensions: initialResolution)
+
         let roomOptions = RoomOptions(
+            defaultCameraCaptureOptions: cameraCaptureOptions,  // ⭐ 카메라 해상도 설정
             defaultAudioCaptureOptions: audioOptions,
-            defaultVideoPublishOptions: videoPublishOptions, // ✅ 추가
+            defaultVideoPublishOptions: videoPublishOptions,
+            defaultAudioPublishOptions: audioPublishOptions,
             adaptiveStream: true,  // ✅ 구독자 측 적응형 스트림
             dynacast: true         // ✅ 구독자 없는 레이어 송출 중지
         )
-        let connectOptions = ConnectOptions(autoSubscribe: true, reconnectAttempts: 10)
+        // Increased reconnect attempts due to network instability
+        let connectOptions = ConnectOptions(autoSubscribe: true, reconnectAttempts: 15)
 
         debugLog("🔌 [CONNECT] Calling room.connect()...")
         try await room.connect(
@@ -210,63 +229,13 @@ final class LiveKitService: NSObject, ObservableObject, LiveKitServiceProtocol {
         debugLog("🔌 [CONNECT] Microphone enabled")
 
         debugLog("🔌 [CONNECT] Enabling camera...")
-        let captureOptions = CameraCaptureOptions(dimensions: .h1080_169)
-        try await room.localParticipant.setCamera(enabled: true, captureOptions: captureOptions)
-        debugLog("🔌 [CONNECT] Camera enabled")
+        // captureOptions를 명시적으로 전달 (WiFi: 1080p, Cellular: 720p)
+        try await room.localParticipant.setCamera(enabled: true, captureOptions: cameraCaptureOptions)
+        debugLog("🔌 [CONNECT] Camera enabled (\(isWiFi ? "1080p" : "720p") start)")
 
-        // 자막 기능 시작
-        transcription.start()
-        debugLog("🔌 [CONNECT] Transcription started")
-
-        // 오디오 시각화 시작
-        audioVisualizer.start()
-        debugLog("🔌 [CONNECT] AudioVisualizer started")
-
-        // Face detection data channel 연결
-        faceDetectionChannel.setRoom(room)
-        debugLog("🔌 [CONNECT] FaceDetectionChannel connected")
-
-        // 센서 데이터 수집 자동 시작
-        // Note: 얼굴 감지는 FaceLandmarkDetector(VideoRenderer)를 통해 자동 처리됨
-        sensorAggregator.start(enableMotionSensor: true)
-        debugLog("🔌 [CONNECT] SensorAggregator started")
-
-        // 케어 알림 서비스 시작 (낙상/음성/감정 알림)
+        // ✅ CallSessionManager를 통해 모든 센서/보조 서비스 시작
         let wardId = room.localParticipant.identity?.stringValue
-        careAlertService.start(room: room, wardId: wardId)
-        debugLog("🔌 [CONNECT] CareAlertService started (wardId: \(wardId ?? "unknown"))")
-
-        // 센서 스트림 서비스 시작 (매초 raw data 전송)
-        SensorStreamService.shared.start(room: room)
-        debugLog("🔌 [CONNECT] SensorStreamService started")
-
-        // 사용자 음성 레벨 모니터링 시작
-        if let localAudioTrack = room.localParticipant.localAudioTracks.first?.track as? LocalAudioTrack {
-            userAudioMonitor.startMonitoring(track: localAudioTrack)
-            debugLog("🔌 [CONNECT] UserAudioMonitor started")
-        } else {
-            debugLog("🔌 [CONNECT] ⚠️ LocalAudioTrack not found for monitoring")
-        }
-
-        // 사람 낙상 감지 시작 (카메라 기반)
-        personFallDetector.start()
-        debugLog("🔌 [CONNECT] PersonFallDetector started")
-
-        // 기기 낙상 감지 시작 (가속도계/자이로 기반)
-        MotionSensorService.shared.startCollection(sendToDataChannel: false)
-        debugLog("🔌 [CONNECT] MotionSensorService started")
-
-        // 얼굴 랜드마크 검출 시작 (감정 분석용 - PIP 터치 없이 자동 시작)
-        if let localVideoTrack = room.localParticipant.localVideoTracks.first?.track as? LocalVideoTrack {
-            FaceLandmarkDetector.shared.startDetection(for: localVideoTrack)
-            debugLog("🔌 [CONNECT] FaceLandmarkDetector started (auto)")
-        } else {
-            debugLog("🔌 [CONNECT] ⚠️ LocalVideoTrack not found for face detection")
-        }
-
-        // 감정 분석 시작
-        emotionAnalyzer.start()
-        debugLog("🔌 [CONNECT] EmotionAnalyzer started")
+        callSessionManager.startSession(room: room, wardId: wardId)
 
         debugLog("🔌 [CONNECT] END - SUCCESS")
         self.objectWillChange.send()
@@ -285,52 +254,8 @@ final class LiveKitService: NSObject, ObservableObject, LiveKitServiceProtocol {
         stopReconnectTimer()
         stopRemoteDisconnectTimer()
 
-        // 오디오 시각화 중지
-        detachAudioVisualizerFromRemoteTracks()
-
-        // 자막 기능 중지
-        transcription.stop()
-        remoteAudioVolumeCache.removeAll()
-        isRemoteAudioEnabled = true
-
-        // Face detection data channel 해제
-        faceDetectionChannel.setRoom(nil)
-
-        // 센서 데이터 수집 자동 중지
-        sensorAggregator.stop()
-        debugLog("🔌 [DISCONNECT] SensorAggregator stopped")
-
-        // 케어 알림 서비스 중지
-        careAlertService.stop()
-        debugLog("🔌 [DISCONNECT] CareAlertService stopped")
-
-        // 센서 스트림 서비스 중지
-        SensorStreamService.shared.stop()
-        debugLog("🔌 [DISCONNECT] SensorStreamService stopped")
-
-        // 사용자 음성 레벨 모니터링 중지
-        if let localAudioTrack = room.localParticipant.localAudioTracks.first?.track as? LocalAudioTrack {
-            userAudioMonitor.stopMonitoring(track: localAudioTrack)
-            debugLog("🔌 [DISCONNECT] UserAudioMonitor stopped")
-        }
-
-        // 사람 낙상 감지 중지
-        personFallDetector.stop()
-        debugLog("🔌 [DISCONNECT] PersonFallDetector stopped")
-
-        // 기기 낙상 감지 중지
-        MotionSensorService.shared.stopCollection()
-        debugLog("🔌 [DISCONNECT] MotionSensorService stopped")
-
-        // 얼굴 랜드마크 검출 중지
-        if let localVideoTrack = room.localParticipant.localVideoTracks.first?.track as? LocalVideoTrack {
-            FaceLandmarkDetector.shared.stopDetection(for: localVideoTrack)
-            debugLog("🔌 [DISCONNECT] FaceLandmarkDetector stopped")
-        }
-
-        // 감정 분석 중지
-        emotionAnalyzer.stop()
-        debugLog("🔌 [DISCONNECT] EmotionAnalyzer stopped")
+        // ✅ CallSessionManager를 통해 모든 센서/보조 서비스 중지
+        callSessionManager.stopSession(room: room)
 
         // Disconnect room (can take time)
         debugLog("🔌 [DISCONNECT] Calling room.disconnect()...")
@@ -347,47 +272,7 @@ final class LiveKitService: NSObject, ObservableObject, LiveKitServiceProtocol {
         applyRemoteAudioState()
     }
 
-    // MARK: - Audio Visualizer
-
-    /// 모든 원격 오디오 트랙에 시각화 렌더러 연결
-    private func attachAudioVisualizerToRemoteTracks() {
-        audioVisualizer.start()
-        for participant in room.remoteParticipants.values {
-            for publication in participant.audioTracks {
-                if let track = publication.track as? RemoteAudioTrack {
-                    track.add(audioRenderer: audioVisualizer)
-                    debugLog("🎵 AudioVisualizer attached to track: \(track.sid?.stringValue ?? "unknown")")
-                }
-            }
-        }
-    }
-
-    /// 모든 원격 오디오 트랙에서 시각화 렌더러 분리
-    private func detachAudioVisualizerFromRemoteTracks() {
-        for participant in room.remoteParticipants.values {
-            for publication in participant.audioTracks {
-                if let track = publication.track as? RemoteAudioTrack {
-                    track.remove(audioRenderer: audioVisualizer)
-                }
-            }
-        }
-        audioVisualizer.stop()
-    }
-
-    /// 특정 트랙에 시각화 렌더러 연결
-    private func attachAudioVisualizer(to track: RemoteAudioTrack) {
-        if !audioVisualizer.isActive {
-            audioVisualizer.start()
-        }
-        track.add(audioRenderer: audioVisualizer)
-        debugLog("🎵 AudioVisualizer attached to new track: \(track.sid?.stringValue ?? "unknown")")
-    }
-
-    /// 특정 트랙에서 시각화 렌더러 분리
-    private func detachAudioVisualizer(from track: RemoteAudioTrack) {
-        track.remove(audioRenderer: audioVisualizer)
-        debugLog("🎵 AudioVisualizer detached from track: \(track.sid?.stringValue ?? "unknown")")
-    }
+    // MARK: - Remote Audio Control
 
     private func applyRemoteAudioState() {
         for participant in room.remoteParticipants.values {
@@ -474,16 +359,9 @@ extension LiveKitService: RoomDelegate {
             if participant is LocalParticipant {
                 if isSpeaking { debugLog("🎤 VAD: Local Speaking") } else { debugLog("🤫 VAD: Local Silent") }
             } else {
-                // 원격 참가자 (AI Agent)가 말할 때 시각화 트리거
+                // 원격 참가자 (AI Agent)가 말할 때 상태 업데이트
                 debugLog("🎙️ VAD: Remote \(isSpeaking ? "Speaking" : "Silent")")
-                if isSpeaking {
-                    // AI가 말하고 있을 때 audioLevel 시뮬레이션
-                    self.audioVisualizer.simulateSpeaking()
-                } else {
-                    self.audioVisualizer.simulateSilent()
-                }
-
-                // TranscriptionManager에도 AI 발화 상태 전달 (듣는중/말하는중 UI용)
+                // TranscriptionManager로 AI 발화 상태 전달 (듣는중/말하는중 UI용)
                 self.transcription.setAISpeaking(isSpeaking)
             }
         }
@@ -538,13 +416,10 @@ extension LiveKitService: RoomDelegate {
                 try? await publication.set(preferredDimensions: Dimensions(width: 1920, height: 1080))
             }
 
-            // 오디오 트랙인 경우 시각화 렌더러 연결
+            // 오디오 트랙인 경우 원격 오디오 상태 적용
             if let audioTrack = publication.track as? RemoteAudioTrack {
-                debugLog("🎵 Audio track detected - attaching visualizer")
+                debugLog("🎵 Audio track subscribed from \(participant.identity?.stringValue ?? "unknown")")
                 self.applyRemoteAudioState(to: audioTrack)
-                self.attachAudioVisualizer(to: audioTrack)
-            } else {
-                debugLog("⚠️ Track is not RemoteAudioTrack: \(type(of: publication.track))")
             }
 
             self.objectWillChange.send()
@@ -554,12 +429,6 @@ extension LiveKitService: RoomDelegate {
     nonisolated func room(_ room: Room, participant: RemoteParticipant, didUnsubscribeTrack publication: RemoteTrackPublication) {
         Task { @MainActor in
             guard !self.isDisconnecting else { return }
-
-            // 오디오 트랙인 경우 시각화 렌더러 분리
-            if let audioTrack = publication.track as? RemoteAudioTrack {
-                self.detachAudioVisualizer(from: audioTrack)
-            }
-
             self.objectWillChange.send()
         }
     }

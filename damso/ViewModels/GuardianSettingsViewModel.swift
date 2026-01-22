@@ -26,14 +26,14 @@ final class GuardianSettingsViewModel: ObservableObject {
     // MARK: - Dependencies
     
     private let userService: UserService
-    private let authService: AuthService
+    private let authRepository: AuthRepositoryProtocol
     private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Initialization
     
-    init(userService: UserService, authService: AuthService) {
+    init(userService: UserService, authRepository: AuthRepositoryProtocol = AuthRepository.shared) {
         self.userService = userService
-        self.authService = authService
+        self.authRepository = authRepository
         loadUserInfo()
     }
     
@@ -55,22 +55,22 @@ final class GuardianSettingsViewModel: ObservableObject {
     
     func confirmUnlinkWard() async {
         guard let ward = selectedWardForUnlink,
-              let wardId = ward.linkedWardId else { return }
-        
-        do {
-            // TODO: API 연동
-            // try await userService.unlinkWard(wardId: wardId)
-            linkedWards.removeAll { $0.id == ward.id }
-            selectedWardForUnlink = nil
-        } catch {
-            // 오류 처리
-        }
+              ward.linkedWardId != nil else { return }
+
+        // TODO: API 연동
+        // try await userService.unlinkWard(wardId: ward.linkedWardId!)
+        linkedWards.removeAll { $0.id == ward.id }
+        selectedWardForUnlink = nil
     }
     
     func logout() {
         isLoggingOut = true
         Task {
-            await authService.logout()
+            do {
+                try await authRepository.logout()
+            } catch {
+                // 로그아웃 실패 시 무시 (로컬 토큰은 이미 삭제됨)
+            }
             isLoggingOut = false
         }
     }

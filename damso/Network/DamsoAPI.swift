@@ -12,6 +12,7 @@ import Moya
 
 enum AuthAPI {
     case login(accessToken: String, userType: UserType?)
+    case loginWithKakao(accessToken: String, kakaoUserInfo: KakaoUserInfo?, userType: UserType?)
     case refresh(refreshToken: String)
     case logout
     case withdraw
@@ -27,7 +28,7 @@ extension AuthAPI: TargetType {
     
     var path: String {
         switch self {
-        case .login:
+        case .login, .loginWithKakao:
             return "/v1/auth/kakao"
         case .refresh:
             return "/v1/auth/refresh"
@@ -40,13 +41,13 @@ extension AuthAPI: TargetType {
         case .registerWard:
             return "/v1/users/register/ward"
         case .devLogin:
-            return "/v1/auth/dev-login"
+            return "/v1/auth/dev/guardian"
         }
     }
     
     var method: Moya.Method {
         switch self {
-        case .login, .refresh, .registerGuardian, .registerWard, .devLogin:
+        case .login, .loginWithKakao, .refresh, .registerGuardian, .registerWard, .devLogin:
             return .post
         case .logout, .withdraw:
             return .delete
@@ -56,9 +57,21 @@ extension AuthAPI: TargetType {
     var task: Moya.Task {
         switch self {
         case .login(let accessToken, let userType):
-            var params: [String: Any] = ["access_token": accessToken]
+            var params: [String: Any] = ["kakaoAccessToken": accessToken]
             if let type = userType {
-                params["user_type"] = type.rawValue
+                params["userType"] = type.rawValue
+            }
+            return .requestParameters(parameters: params, encoding: JSONEncoding.default)
+            
+        case .loginWithKakao(let accessToken, let kakaoUserInfo, let userType):
+            var params: [String: Any] = ["kakaoAccessToken": accessToken]
+            if let type = userType {
+                params["userType"] = type.rawValue
+            }
+            if let info = kakaoUserInfo {
+                if let nickname = info.nickname { params["nickname"] = nickname }
+                if let email = info.email { params["email"] = email }
+                if let profileUrl = info.profileImageUrl { params["profileImageUrl"] = profileUrl.absoluteString }
             }
             return .requestParameters(parameters: params, encoding: JSONEncoding.default)
             

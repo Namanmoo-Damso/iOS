@@ -44,14 +44,10 @@ final class AlertDetailViewModel: ObservableObject {
     
     func acknowledgeAlert() async {
         guard !isAcknowledged else { return }
-        
-        do {
-            // TODO: API 연동
-            // try await careAlertService.acknowledgeAlert(alertId: alert.id)
-            isAcknowledged = true
-        } catch {
-            // 오류 처리
-        }
+
+        // TODO: API 연동
+        // try await careAlertService.acknowledgeAlert(alertId: alert.id)
+        isAcknowledged = true
     }
     
     func callWard() {

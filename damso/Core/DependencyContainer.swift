@@ -25,6 +25,10 @@ final class DependencyContainer {
     private(set) lazy var pushNotificationService: PushNotificationService = PushNotificationService.shared
     private(set) lazy var wardSettingsService: WardSettingsService = WardSettingsService.shared
     private(set) lazy var callService: CallService = CallService.shared
+    
+    // MARK: - Repositories
+    
+    private(set) lazy var authRepository: AuthRepositoryProtocol = AuthRepository.shared
 
     private init() {}
 
@@ -66,7 +70,7 @@ final class DependencyContainer {
     func makeGuardianSettingsViewModel() -> GuardianSettingsViewModel {
         GuardianSettingsViewModel(
             userService: userService,
-            authService: authService
+            authRepository: authRepository
         )
     }
 

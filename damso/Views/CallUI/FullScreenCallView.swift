@@ -5,8 +5,8 @@ import LiveKit
 struct FullScreenCallView: View {
     @ObservedObject var viewModel: AppLiveKitViewModel
     @ObservedObject private var networkMonitor = NetworkMonitor.shared
-    @ObservedObject private var audioVisualizer = AudioVisualizerManager.shared
     @ObservedObject private var transcription = TranscriptionManager.shared
+    @ObservedObject private var videoStatsLogger = VideoStatsLogger.shared
     // Singleton이지만 View의 생명주기 동안 관찰을 보장하기 위해 StateObject 사용 고려, 그러나 shared 인스턴스이므로 ObservedObject 유지하되 MainActor 보장
     @ObservedObject private var careAlertService = CareAlertService.shared
 
@@ -86,13 +86,11 @@ struct FullScreenCallView: View {
                     if !isPIPExpanded {
                         HStack {
                             Spacer()
-                            VStack(spacing: 8) {
-                                // 내 네트워크 상태 표시
-                                MyNetworkStatusView(
-                                    connectionQuality: room.localParticipant.connectionQuality,
-                                    connectionType: networkMonitor.connectionType
-                                )
-                            }
+                            // 내 네트워크 상태 표시
+                            MyNetworkStatusView(
+                                connectionQuality: effectiveLocalConnectionQuality,
+                                connectionType: networkMonitor.connectionType
+                            )
                             .padding(.trailing, 16)
                             .padding(.top, 8)
                         }
@@ -184,6 +182,15 @@ struct FullScreenCallView: View {
                         : pipSize(screenWidth: geometry.size.width).height / 2 + 60
                 )
                 .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isPIPExpanded)
+                
+                // 해상도 인디케이터 - PIP 바로 아래 중앙
+                if !isPIPExpanded && videoStatsLogger.resolution != "N/A" {
+                    VideoResolutionIndicator(resolution: videoStatsLogger.resolution)
+                        .position(
+                            x: geometry.size.width - pipSize(screenWidth: geometry.size.width).width / 2 - 16,
+                            y: pipSize(screenWidth: geometry.size.width).height + 60 + 20  // PIP 아래 20pt 간격
+                        )
+                }
             }
 
             // Reconnecting overlay
@@ -271,6 +278,19 @@ struct FullScreenCallView: View {
             return .unknown
         }
         return firstParticipant.connectionQuality
+    }
+    
+    /// 로컬 연결 품질 (LiveKit SDK 값이 unknown이면 추정값 사용)
+    private var effectiveLocalConnectionQuality: ConnectionQuality {
+        let liveKitQuality = room.localParticipant.connectionQuality
+        
+        // LiveKit SDK가 unknown이 아니면 그대로 사용
+        if liveKitQuality != .unknown {
+            return liveKitQuality
+        }
+        
+        // unknown이면 실제 통계 기반 추정값 사용
+        return videoStatsLogger.estimatedQuality
     }
 
     // MARK: - Video Quality

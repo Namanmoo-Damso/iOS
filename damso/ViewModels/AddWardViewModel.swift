@@ -21,13 +21,13 @@ final class AddWardViewModel: ObservableObject {
     
     // MARK: - Dependencies
     
-    private let authService: AuthService
+    private let authRepository: AuthRepositoryProtocol
     private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Initialization
     
-    init(authService: AuthService = .shared) {
-        self.authService = authService
+    init(authRepository: AuthRepositoryProtocol = AuthRepository.shared) {
+        self.authRepository = authRepository
     }
     
     // MARK: - Public Methods

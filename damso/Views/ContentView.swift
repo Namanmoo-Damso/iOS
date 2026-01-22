@@ -19,17 +19,7 @@ struct InviteInfo: Equatable {
     let wardEmail: String
 }
 
-/// 앱 네비게이션 상태
-enum AppNavigationState: Equatable {
-    case splash                       // 로딩 중
-    case serverSelection              // 서버 선택
-    case userTypeSelection            // 사용자 타입 선택
-    case login(UserType)              // 카카오 로그인 (선택된 타입 포함)
-    case guardianRegistration         // 보호자 등록 폼
-    case inviteCompletion(InviteInfo) // 초대 완료 화면
-    case permissionOnboarding(UserType) // 권한 요청 온보딩
-    case main                         // 메인 화면
-}
+// AppNavigationState is now defined in Core/AppCoordinator.swift
 
 struct ContentView: View {
     @StateObject private var viewModel = ContentViewModel()

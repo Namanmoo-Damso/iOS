@@ -9,7 +9,6 @@
 /* Begin PBXBuildFile section */
 		4F1B9B9B2F203AE300676EEE /* CombineMoya in Frameworks */ = {isa = PBXBuildFile; productRef = 4F1B9B9A2F203AE300676EEE /* CombineMoya */; };
 		4F1B9B9D2F203AE300676EEE /* Moya in Frameworks */ = {isa = PBXBuildFile; productRef = 4F1B9B9C2F203AE300676EEE /* Moya */; };
-		4F1B9BD22F20455700676EEE /* LiveKitComponents in Frameworks */ = {isa = PBXBuildFile; productRef = 4F1B9BD12F20455700676EEE /* LiveKitComponents */; };
 		4F27E07D2F12D86A00480C18 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = 4F27E07C2F12D86A00480C18 /* FluidAudio */; };
 		4FCB14952EFDA8E100ADACA9 /* LiveKit in Frameworks */ = {isa = PBXBuildFile; productRef = 4FCB14942EFDA8E100ADACA9 /* LiveKit */; };
 		4FF7E0222F02A57D003B6A35 /* KakaoSDKAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 4FF7E0212F02A57D003B6A35 /* KakaoSDKAuth */; };
@@ -84,7 +83,6 @@
 				4FF7E0262F02A57D003B6A35 /* KakaoSDKUser in Frameworks */,
 				4FCB14952EFDA8E100ADACA9 /* LiveKit in Frameworks */,
 				4F1B9B9D2F203AE300676EEE /* Moya in Frameworks */,
-				4F1B9BD22F20455700676EEE /* LiveKitComponents in Frameworks */,
 				4F27E07D2F12D86A00480C18 /* FluidAudio in Frameworks */,
 				4FF7E0242F02A57D003B6A35 /* KakaoSDKCommon in Frameworks */,
 				4FF7E0222F02A57D003B6A35 /* KakaoSDKAuth in Frameworks */,
@@ -160,7 +158,6 @@
 				4F27E07C2F12D86A00480C18 /* FluidAudio */,
 				4F1B9B9A2F203AE300676EEE /* CombineMoya */,
 				4F1B9B9C2F203AE300676EEE /* Moya */,
-				4F1B9BD12F20455700676EEE /* LiveKitComponents */,
 			);
 			productName = damso;
 			productReference = 4F0B95642EFD97C800B8DCDE /* damso.app */;
@@ -255,7 +252,6 @@
 				4FF7E0202F02A57D003B6A35 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */,
 				4F27E07B2F12D86A00480C18 /* XCRemoteSwiftPackageReference "FluidAudio" */,
 				4F1B9B992F203AE300676EEE /* XCRemoteSwiftPackageReference "Moya" */,
-				4F1B9BD02F20455700676EEE /* XCRemoteSwiftPackageReference "components-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 4F0B95652EFD97C800B8DCDE /* Products */;
@@ -707,14 +703,6 @@
 				minimumVersion = 15.0.3;
 			};
 		};
-		4F1B9BD02F20455700676EEE /* XCRemoteSwiftPackageReference "components-swift" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/livekit/components-swift.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.1.6;
-			};
-		};
 		4F27E07B2F12D86A00480C18 /* XCRemoteSwiftPackageReference "FluidAudio" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/FluidInference/FluidAudio.git";
@@ -751,11 +739,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 4F1B9B992F203AE300676EEE /* XCRemoteSwiftPackageReference "Moya" */;
 			productName = Moya;
-		};
-		4F1B9BD12F20455700676EEE /* LiveKitComponents */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 4F1B9BD02F20455700676EEE /* XCRemoteSwiftPackageReference "components-swift" */;
-			productName = LiveKitComponents;
 		};
 		4F27E07C2F12D86A00480C18 /* FluidAudio */ = {
 			isa = XCSwiftPackageProductDependency;

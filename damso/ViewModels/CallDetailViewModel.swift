@@ -37,18 +37,14 @@ final class CallDetailViewModel: ObservableObject {
     
     func loadCallDetails() async {
         isLoading = true
-        
-        do {
-            // TODO: API 연동 시 실제 호출로 변경
-            // let details = try await callService.fetchCallDetail(callId: call.id)
-            
-            // 현재는 기본값 사용
-            transcription = call.summary
-            aiInsight = generateAIInsight()
-        } catch {
-            // 오류 처리
-        }
-        
+
+        // TODO: API 연동 시 실제 호출로 변경
+        // let details = try await callService.fetchCallDetail(callId: call.id)
+
+        // 현재는 기본값 사용
+        transcription = call.summary
+        aiInsight = generateAIInsight()
+
         isLoading = false
     }
     

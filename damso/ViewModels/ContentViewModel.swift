@@ -150,15 +150,13 @@ final class ContentViewModel: ObservableObject {
             do {
                 kakaoUserInfo = loginResult.userInfo
                 
-                // TODO: AuthService 대신 AuthRepository 사용
-                // 하지만 현재 AuthRepository 프로토콜 메서드가 loginWithKakao와 일치하지 않을 수 있음 (API 스펙 확인)
-                // 임시로 AuthService 사용 (Repository Migration이 완벽하지 않음)
-                let authService = AuthService.shared
-                let authResponse = try await authService.loginWithKakao(
-                    kakaoAccessToken: loginResult.accessToken,
+                // AuthRepository를 통한 로그인 (Moya 기반)
+                let authResponse = try await authRepository.loginWithKakao(
+                    accessToken: loginResult.accessToken,
                     kakaoUserInfo: loginResult.userInfo,
                     userType: userType
                 )
+
                 
                 if authResponse.isNewUserFlag {
                     if userType == .ward {

@@ -160,7 +160,9 @@ struct UserTypeSelectionView: View {
                 
                 // 보호자 테스트 버튼 (dev API 사용)
                 Button {
-                    viewModel.performDevLogin(appState: appState)
+                    Task { @MainActor in
+                        viewModel.performDevLogin(appState: appState)
+                    }
                 } label: {
                     HStack(spacing: 8) {
                         if viewModel.isDevLoggingIn {
