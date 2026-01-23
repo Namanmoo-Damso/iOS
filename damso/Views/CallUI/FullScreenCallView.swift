@@ -10,9 +10,8 @@ struct FullScreenCallView: View {
     // Singleton이지만 View의 생명주기 동안 관찰을 보장하기 위해 StateObject 사용 고려, 그러나 shared 인스턴스이므로 ObservedObject 유지하되 MainActor 보장
     @ObservedObject private var careAlertService = CareAlertService.shared
 
-    // Shortcut accessors
+    // Shortcut accessor
     var room: Room { viewModel.room }
-    var localMedia: LocalMedia { viewModel.localMedia }
 
     @State private var isRemoteAudioEnabled = true
     @State private var showNetworkAlert = false
@@ -100,7 +99,7 @@ struct FullScreenCallView: View {
                 Spacer()
 
                 // 영상통화일 때만 화질 선택기 표시
-                if !isAudioOnlyMode && localMedia.isCameraEnabled {
+                if !isAudioOnlyMode && room.localParticipant.isCameraEnabled() {
                     VideoQualitySelector(
                         selectedQuality: $selectedVideoQuality,
                         isExpanded: $isQualitySelectorExpanded,
@@ -166,9 +165,9 @@ struct FullScreenCallView: View {
             // 단일 LocalVideoPIP 인스턴스 - 위치만 상태에 따라 변경
             GeometryReader { geometry in
                 LocalVideoPIP(
-                    track: localMedia.cameraTrack,
-                    isCameraEnabled: localMedia.isCameraEnabled,
-                    isMicEnabled: localMedia.isMicrophoneEnabled,
+                    track: room.localParticipant.firstCameraVideoTrack,
+                    isCameraEnabled: room.localParticipant.isCameraEnabled(),
+                    isMicEnabled: room.localParticipant.isMicrophoneEnabled(),
                     isCompact: !isPIPExpanded,
                     isExpanded: $isPIPExpanded,
                     showMesh: $showPIPMesh
@@ -306,12 +305,12 @@ struct FullScreenCallView: View {
         guard let dimensions = quality.dimensions else {
             // Auto mode - 기본 720p 사용
             let captureOptions = CameraCaptureOptions(dimensions: .h720_169)
-            _ = try? await room.localParticipant.setCamera(enabled: localMedia.isCameraEnabled, captureOptions: captureOptions)
+            _ = try? await room.localParticipant.setCamera(enabled: room.localParticipant.isCameraEnabled(), captureOptions: captureOptions)
             return
         }
 
         let captureOptions = CameraCaptureOptions(dimensions: dimensions)
-        _ = try? await room.localParticipant.setCamera(enabled: localMedia.isCameraEnabled, captureOptions: captureOptions)
+        _ = try? await room.localParticipant.setCamera(enabled: room.localParticipant.isCameraEnabled(), captureOptions: captureOptions)
     }
 
     // MARK: - Call Stage State
@@ -486,11 +485,14 @@ struct FullScreenCallView: View {
 private extension FullScreenCallView {
     var bottomOverlay: some View {
         CallControlBar(
-            isMicEnabled: localMedia.isMicrophoneEnabled,
+            isMicEnabled: room.localParticipant.isMicrophoneEnabled(),
             isSpeakerEnabled: isRemoteAudioEnabled,
-            isCameraEnabled: localMedia.isCameraEnabled,
+            isCameraEnabled: room.localParticipant.isCameraEnabled(),
             onToggleMic: {
-                Task { await localMedia.toggleMicrophone() }
+                Task {
+                    let newState = !room.localParticipant.isMicrophoneEnabled()
+                    _ = try? await room.localParticipant.setMicrophone(enabled: newState)
+                }
             },
             onEndCall: {
                 onDismiss()
@@ -503,7 +505,10 @@ private extension FullScreenCallView {
                 }
             },
             onToggleCamera: {
-                Task { await localMedia.toggleCamera() }
+                Task {
+                    let newState = !room.localParticipant.isCameraEnabled()
+                    _ = try? await room.localParticipant.setCamera(enabled: newState)
+                }
             }
         )
         .background(Color.black)

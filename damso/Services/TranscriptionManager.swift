@@ -63,11 +63,6 @@ final class TranscriptionManager: ObservableObject {
     /// LiveKit VAD가 활성화되었는지 여부 (한 번이라도 호출되면 true)
     private var isLiveKitVADActive: Bool = false
 
-    /// 자막 기반 fallback 타이머
-    private var subtitleFallbackTimer: DispatchWorkItem?
-
-    /// 자막 기반 fallback 타임아웃 (초)
-    private let subtitleFallbackTimeout: TimeInterval = 2.0
 
     // MARK: - Initialization
 
@@ -92,10 +87,6 @@ final class TranscriptionManager: ObservableObject {
         // LiveKit VAD가 동작함을 표시
         isLiveKitVADActive = true
 
-        // 자막 fallback 타이머 취소 (LiveKit VAD가 제어권 가짐)
-        subtitleFallbackTimer?.cancel()
-        subtitleFallbackTimer = nil
-
         guard isAISpeaking != speaking else { return }
         isAISpeaking = speaking
         #if DEBUG
@@ -107,9 +98,8 @@ final class TranscriptionManager: ObservableObject {
     func updateAgentSubtitle(text: String, isFinal: Bool) {
         guard isActive else { return }
 
-        // LiveKit VAD가 동작 중이면 자막으로 상태 변경하지 않음
+        // LiveKit VAD가 없을 때 자막 기반으로 발화 상태 추정 (즉시 전환)
         if !isLiveKitVADActive {
-            // Fallback: 자막 기반으로 AI 발화 상태 추정
             if !text.isEmpty && !isAISpeaking {
                 // 명시적으로 objectWillChange 트리거
                 objectWillChange.send()
@@ -126,39 +116,18 @@ final class TranscriptionManager: ObservableObject {
             addMessage(message)
             currentAgentText = ""
 
-            // LiveKit VAD가 없으면 타이머로 종료 감지
-            if !isLiveKitVADActive {
-                scheduleSubtitleFallbackEnd()
+            if !isLiveKitVADActive && isAISpeaking {
+                // 자막 종료 시 즉시 듣기 상태로 전환
+                objectWillChange.send()
+                isAISpeaking = false
+                #if DEBUG
+                print("🎙️ [Transcription] AI Listening (subtitle fallback) → isAISpeaking=\(isAISpeaking)")
+                #endif
             }
         } else {
             // 진행 중인 자막은 현재 텍스트로 표시
             currentAgentText = text
-
-            // 진행 중인 자막도 타이머 리셋
-            if !isLiveKitVADActive && !text.isEmpty {
-                scheduleSubtitleFallbackEnd()
-            }
         }
-    }
-
-    /// 자막 기반 AI 발화 종료 타이머 (fallback)
-    private func scheduleSubtitleFallbackEnd() {
-        subtitleFallbackTimer?.cancel()
-
-        let workItem = DispatchWorkItem { [weak self] in
-            guard let self = self, !self.isLiveKitVADActive else { return }
-            if self.currentAgentText.isEmpty {
-                // 명시적으로 objectWillChange 트리거
-                self.objectWillChange.send()
-                self.isAISpeaking = false
-                #if DEBUG
-                print("🎙️ [Transcription] AI Listening (subtitle fallback timeout) → isAISpeaking=\(self.isAISpeaking)")
-                #endif
-            }
-        }
-
-        subtitleFallbackTimer = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + subtitleFallbackTimeout, execute: workItem)
     }
 
     /// 사용자 자막 업데이트 (STT 결과)
@@ -178,8 +147,6 @@ final class TranscriptionManager: ObservableObject {
 
     /// 모든 자막 초기화
     func clearAll() {
-        subtitleFallbackTimer?.cancel()
-        subtitleFallbackTimer = nil
         isLiveKitVADActive = false
 
         messages = []

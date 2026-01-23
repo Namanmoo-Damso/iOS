@@ -142,6 +142,15 @@ final class CareAlertService: ObservableObject {
         #if canImport(LiveKit)
         room = nil
         #endif
+
+        // 모든 상태 초기화 - 다음 통화에서 이전 상태가 유지되지 않도록
+        lastSentAlert = nil
+        alertsSentCount = 0
+        showFallConfirmationAlert = false
+        currentAlertType = .deviceFall
+        currentFallEvent = nil
+        currentAlertId = nil
+
         isActive = false
         debugLog("CareAlertService stopped")
     }

@@ -129,15 +129,24 @@ final class VideoStatsLogger: ObservableObject {
         let currentStats = getNetworkStats()
         
         // 비트레이트 계산 (bytes -> Mbps)
-        let deltaBytesSent = currentStats.bytesSent - previousBytesSent
-        let deltaBytesReceived = currentStats.bytesReceived - previousBytesReceived
+        // 네트워크 인터페이스 변경 또는 카운터 리셋 시 오버플로우 방지
+        let deltaBytesSent = currentStats.bytesSent >= previousBytesSent
+            ? currentStats.bytesSent - previousBytesSent
+            : currentStats.bytesSent
+        let deltaBytesReceived = currentStats.bytesReceived >= previousBytesReceived
+            ? currentStats.bytesReceived - previousBytesReceived
+            : currentStats.bytesReceived
         
         uploadBitrate = Double(deltaBytesSent) * 8.0 / elapsedSeconds / 1_000_000.0     // Mbps
         downloadBitrate = Double(deltaBytesReceived) * 8.0 / elapsedSeconds / 1_000_000.0 // Mbps
         
-        // 세션 시작 이후 총 전송량
-        totalBytesSent = currentStats.bytesSent - sessionStartBytesSent
-        totalBytesReceived = currentStats.bytesReceived - sessionStartBytesReceived
+        // 세션 시작 이후 총 전송량 (오버플로우 방지)
+        totalBytesSent = currentStats.bytesSent >= sessionStartBytesSent
+            ? currentStats.bytesSent - sessionStartBytesSent
+            : currentStats.bytesSent
+        totalBytesReceived = currentStats.bytesReceived >= sessionStartBytesReceived
+            ? currentStats.bytesReceived - sessionStartBytesReceived
+            : currentStats.bytesReceived
         packetsSent = currentStats.packetsSent
         packetsReceived = currentStats.packetsReceived
         

@@ -88,8 +88,8 @@ private enum SodamMessages {
         "오늘도 힘내세요!",
     ]
 
-    /// 시간대에 따른 메시지 선택 (이름 포함)
-    static func randomMessage(name: String?) -> String {
+    /// 시간대에 따른 메시지 선택
+    static func randomMessage() -> String {
         let hour = Calendar.current.component(.hour, from: Date())
 
         let pool: [String]
@@ -113,10 +113,6 @@ private enum SodamMessages {
 
         let message = pool.randomElement() ?? "안녕하세요!"
 
-        // 이름이 있으면 "xxx 어르신! " 접두사 추가
-        if let name = name, !name.isEmpty {
-            return "\(name) 어르신!\n\(message)"
-        }
         return message
     }
 }
@@ -166,8 +162,8 @@ struct WardHomeTabContent: View {
             }
         }
         .onAppear {
-            // 어르신 이름 포함하여 메시지 갱신
-            currentMessage = SodamMessages.randomMessage(name: appState.currentUser?.nickname)
+            // 메시지 갱신 (이름 표시 없음)
+            currentMessage = SodamMessages.randomMessage()
             // 위치 추적 자동 시작
             if locationTrackingEnabled {
                 LocationService.shared.startTracking()

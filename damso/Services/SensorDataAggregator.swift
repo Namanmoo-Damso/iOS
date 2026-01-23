@@ -82,6 +82,7 @@ final class SensorDataAggregator: ObservableObject {
 
         latestFaceData = nil
         latestMotionData = nil
+        lastAggregatedData = nil  // 이전 통화 데이터 초기화
 
         isRunning = false
         currentStatus = .idle
