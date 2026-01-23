@@ -36,7 +36,7 @@ final class LiveKitService: NSObject, ObservableObject, LiveKitServiceProtocol {
     private var isRemoteAudioEnabled: Bool = true
     private var remoteAudioVolumeCache: [ObjectIdentifier: Double] = [:]
 
-    let room: Room
+    private(set) var room: Room
     private var _localMedia: LocalMedia?
 
     /// LocalMedia는 실제로 필요할 때만 생성 (권한 요청 지연)
@@ -45,6 +45,25 @@ final class LiveKitService: NSObject, ObservableObject, LiveKitServiceProtocol {
             _localMedia = LocalMedia(room: room)
         }
         return _localMedia!
+    }
+
+    /// 새 Room 생성 (이전 통화 상태 완전 초기화)
+    private func createFreshRoom() {
+        // 기존 room의 delegate 제거
+        room.remove(delegate: self)
+
+        // 새 Room 생성
+        let newRoom = Room()
+        newRoom.add(delegate: self)
+        room = newRoom
+
+        // LocalMedia도 새 room에 맞게 초기화
+        _localMedia = nil
+
+        debugLog("🔄 [ROOM] Created fresh Room instance")
+
+        // ⚡ Room 교체 후 UI 업데이트 트리거
+        self.objectWillChange.send()
     }
 
     private var reconnectTimer: Timer?
@@ -151,11 +170,8 @@ final class LiveKitService: NSObject, ObservableObject, LiveKitServiceProtocol {
             return
         }
 
-        if room.connectionState != .disconnected {
-            debugLog("🔌 [CONNECT] Disconnecting first...")
-            await room.disconnect()
-            debugLog("🔌 [CONNECT] Disconnected, now reconnecting")
-        }
+        // 🔄 매 통화마다 새 Room 생성 - 이전 통화의 mute/camera 상태 완전 초기화
+        createFreshRoom()
 
         let audioOptions = AudioCaptureOptions(
             echoCancellation: true,
@@ -168,7 +184,7 @@ final class LiveKitService: NSObject, ObservableObject, LiveKitServiceProtocol {
         // 음성 통화 품질 개선 (Hi-Fi보다는 음성 최적화)
         let audioPublishOptions = AudioPublishOptions(
             encoding: .presetSpeech,  // 24kbps - 음성 통화 최적화
-            dtx: true,   // 무음 시 대역폭 절약
+            dtx: false,  // 무음도 전송 (짧은 발화 감지 개선)
             red: true    // 패킷 손실 시 오디오 복구 (끊김 방지)
         )
 
@@ -224,14 +240,23 @@ final class LiveKitService: NSObject, ObservableObject, LiveKitServiceProtocol {
         )
         debugLog("🔌 [CONNECT] room.connect() completed - state=\(room.connectionState)")
 
+        // 🔄 마이크/카메라 초기화 - 항상 켜진 상태로 시작
         debugLog("🔌 [CONNECT] Enabling microphone...")
         try await room.localParticipant.setMicrophone(enabled: true)
-        debugLog("🔌 [CONNECT] Microphone enabled")
+        let micState = room.localParticipant.isMicrophoneEnabled()
+        debugLog("🔌 [CONNECT] Microphone enabled - actual state: \(micState)")
+
+        // ⚡ 마이크 상태 변경 후 즉시 UI 업데이트 트리거
+        self.objectWillChange.send()
 
         debugLog("🔌 [CONNECT] Enabling camera...")
         // captureOptions를 명시적으로 전달 (WiFi: 1080p, Cellular: 720p)
         try await room.localParticipant.setCamera(enabled: true, captureOptions: cameraCaptureOptions)
-        debugLog("🔌 [CONNECT] Camera enabled (\(isWiFi ? "1080p" : "720p") start)")
+        let camState = room.localParticipant.isCameraEnabled()
+        debugLog("🔌 [CONNECT] Camera enabled (\(isWiFi ? "1080p" : "720p") start) - actual state: \(camState)")
+
+        // ⚡ 카메라 상태 변경 후 즉시 UI 업데이트 트리거
+        self.objectWillChange.send()
 
         // ✅ CallSessionManager를 통해 모든 센서/보조 서비스 시작
         let wardId = room.localParticipant.identity?.stringValue
@@ -257,10 +282,20 @@ final class LiveKitService: NSObject, ObservableObject, LiveKitServiceProtocol {
         // ✅ CallSessionManager를 통해 모든 센서/보조 서비스 중지
         callSessionManager.stopSession(room: room)
 
+        // 🔄 트랙 명시적 정리 - 다음 통화 시 clean state 보장
+        debugLog("🔌 [DISCONNECT] Disabling microphone and camera...")
+        _ = try? await room.localParticipant.setMicrophone(enabled: false)
+        _ = try? await room.localParticipant.setCamera(enabled: false)
+        debugLog("🔌 [DISCONNECT] Tracks disabled")
+
         // Disconnect room (can take time)
         debugLog("🔌 [DISCONNECT] Calling room.disconnect()...")
         await room.disconnect()
         debugLog("🔌 [DISCONNECT] room.disconnect() completed")
+
+        // 🔄 Remote audio 상태 초기화
+        isRemoteAudioEnabled = true
+        remoteAudioVolumeCache.removeAll()
 
         self.connectionState = .disconnected
         isDisconnecting = false

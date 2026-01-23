@@ -109,10 +109,34 @@ final class ContentViewModel: ObservableObject {
         if deeplinkManager.hasUnhandledDeeplink {
             Log.ui.i("Universal Link 감지됨 - 서버 선택 후 처리 예정")
         }
-        
-        // 서버 선택 화면으로 이동
-        Log.ui.i("서버 선택 화면으로 이동")
-        navigationState = .serverSelection
+
+        // 서버 자동 설정 (StartView 건너뛰기)
+        AppConfig.serverDomain = "2.sodam.store"
+        AppConfig.selectedDeveloperName = "임익화"
+        AppConfig.usesApiPrefix = false
+        Log.ui.i("서버 자동 설정 완료 (서버: \(AppConfig.serverDomain)) - 인증 상태 확인 중...")
+
+        await AppState.shared.checkAuthStatus()
+
+        if AppState.shared.isAuthenticated {
+            Log.ui.i("자동 로그인 성공 - 메인으로 이동")
+            navigationState = .main
+        } else {
+            Log.ui.i("인증되지 않음 - 사용자 타입 선택으로 이동")
+            if TokenManager.shared.hasTokens {
+                Log.ui.w("기존 토큰 발견 - 삭제")
+                TokenManager.shared.clearTokens()
+            }
+
+            if deeplinkManager.hasUnhandledDeeplink, let userType = deeplinkManager.requestedUserType {
+                selectedUserType = userType
+                shouldAutoTriggerLogin = deeplinkManager.shouldAutoTriggerLogin
+                deeplinkManager.clearDeeplink()
+                navigationState = .login(userType)
+            } else {
+                navigationState = .userTypeSelection
+            }
+        }
     }
     
     func handleServerSelected() {

@@ -25,14 +25,10 @@ struct WardHeaderView: View {
         }
     }
 
-    private var nickname: String {
-        user?.nickname ?? "사용자"
-    }
-
     var body: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(greeting), \(nickname)님!")
+                Text("\(greeting)!")
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundColor(.primary)
