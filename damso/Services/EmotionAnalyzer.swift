@@ -50,13 +50,13 @@ final class EmotionAnalyzer: ObservableObject {
     var analysisInterval: Float = 3.0
 
     /// 최소 신뢰도 - 일반 감정 (이 이상이어야 알림 전송)
-    var minimumConfidence: Float = 0.5
+    var minimumConfidence: Float = 0.8
 
     /// 최소 신뢰도 - 부정적 감정 (더 낮은 임계값으로 민감하게 감지)
-    var minimumConfidenceForNegative: Float = 0.3
+    var minimumConfidenceForNegative: Float = 0.7
 
     /// 부정적 감정만 알림 전송 여부
-    var onlyNegativeEmotions: Bool = false
+    var onlyNegativeEmotions: Bool = true
 
     // MARK: - Private Properties
 

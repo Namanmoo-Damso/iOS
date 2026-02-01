@@ -170,12 +170,6 @@ struct CallDetailView: View {
                 .font(.body)
                 .foregroundColor(.primary)
                 .lineSpacing(4)
-
-            // 추가 요약 정보
-            Text("어머니께서는 오늘 아침에 일어나시자마자 창문을 열어 바깥 공기를 마셨다고 하셨습니다. 날씨가 맑아서 기분이 좋으셨고, 아침 식사 후 동네 공원에서 30분 정도 산책을 하셨다고 합니다. 산책 중에 이웃 할머니를 만나 잠시 이야기를 나누셨고, 함께 벤치에 앉아 따뜻한 햇볕을 쬐셨다고 합니다.")
-                .font(.body)
-                .foregroundColor(.secondary)
-                .lineSpacing(4)
         }
         .padding()
         .background(
@@ -242,32 +236,25 @@ struct CallDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader(title: "주요 키워드", icon: "tag.fill")
 
-            FlowLayout(spacing: 8) {
-                ForEach(call.tags + ["아침 산책", "이웃", "햇볕", "공원"], id: \.self) { tag in
-                    Text(tag)
-                        .font(.subheadline)
-                        .foregroundColor(.blue)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.blue.opacity(0.1))
-                        .clipShape(Capsule())
-                }
-            }
-
-            // 키워드 빈도
-            VStack(alignment: .leading, spacing: 8) {
-                Text("자주 언급된 단어")
-                    .font(.caption)
+            if call.tags.isEmpty {
+                Text("키워드가 없습니다")
+                    .font(.subheadline)
                     .foregroundColor(.secondary)
-                    .padding(.top, 8)
-
-                HStack(spacing: 16) {
-                    keywordFrequency(word: "날씨", count: 5)
-                    keywordFrequency(word: "산책", count: 4)
-                    keywordFrequency(word: "기분", count: 3)
-                    keywordFrequency(word: "이웃", count: 2)
+            } else {
+                FlowLayout(spacing: 8) {
+                    ForEach(call.tags, id: \.self) { tag in
+                        Text(tag)
+                            .font(.subheadline)
+                            .foregroundColor(.blue)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.blue.opacity(0.1))
+                            .clipShape(Capsule())
+                    }
                 }
             }
+
+            // TODO: Transcript 데이터 연동 후 NaturalLanguage로 키워드 빈도 분석 추가
         }
         .padding()
         .background(
