@@ -43,6 +43,7 @@ struct ScheduleManagementView: View {
                 // 전체 활성화 토글
                 Section {
                     Toggle("AI 안부 전화 활성화", isOn: $viewModel.isScheduleEnabled)
+                        .disabled(viewModel.isLoading)  // 로딩 중 조작 불가
                         .onChange(of: viewModel.isScheduleEnabled) { _, newValue in
                             Task {
                                 await viewModel.updateScheduleEnabled(newValue)
@@ -268,6 +269,12 @@ final class ScheduleManagementViewModel: ObservableObject {
 
     /// 변경사항 저장
     func saveChanges() async {
+        // 스케줄이 없으면 저장 스킵 (빈 배열 전송 방지)
+        guard !scheduleItems.isEmpty else {
+            Log.app.w("스케줄이 없어 저장 스킵")
+            return
+        }
+
         let schedule = AICallSchedule(items: scheduleItems, isEnabled: isScheduleEnabled)
 
         do {
@@ -284,8 +291,14 @@ final class ScheduleManagementViewModel: ObservableObject {
 
     /// 스케줄 활성화 상태 업데이트
     func updateScheduleEnabled(_ enabled: Bool) async {
-        // 프로그래매틱 변경 중이면 무시 (무한 루프 방지)
-        guard !isSuppressingOnChange else { return }
+        // 로딩 중이거나 프로그래매틱 변경 중이면 무시 (경쟁 조건 방지)
+        guard !isLoading, !isSuppressingOnChange else { return }
+
+        // 스케줄이 없으면 API 호출 스킵 (빈 배열 전송 방지)
+        guard !scheduleItems.isEmpty else {
+            Log.app.w("스케줄이 없어 활성화 상태 업데이트 스킵")
+            return
+        }
 
         // 활성화 상태 변경 시에도 전체 스케줄 저장
         let schedule = AICallSchedule(items: scheduleItems, isEnabled: enabled)
